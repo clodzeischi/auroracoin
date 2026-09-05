@@ -5,15 +5,15 @@ import {
   onSnapshot,
   addDoc,
   doc,
+  setDoc,
   updateDoc,
   deleteDoc,
+  where,
   serverTimestamp,
 } from 'firebase/firestore';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { getDb, getAuthInstance, getProvider } from './firebaseApp.js';
 import { UNCATEGORIZED } from './categories.js';
-
-const COLLECTION = 'transactions';
 
 /**
  * Documents written before money became decimal store `amount` as a whole
@@ -27,13 +27,12 @@ const readAmountMinor = (data) => {
   return null;
 };
 
-const toTransaction = (doc) => {
-  const data = doc.data();
+const toTransaction = (snapshot) => {
+  const data = snapshot.data();
   return {
-    id: doc.id,
+    id: snapshot.id,
     amountMinor: readAmountMinor(data),
     comment: data.comment,
-    // Documents written before categories existed have no field at all.
     category: data.category ?? UNCATEGORIZED,
     user: data.user,
     userName: data.userName ?? null,
@@ -45,7 +44,11 @@ const toTransaction = (doc) => {
   };
 };
 
+const transactionsPath = (familyId, childId) =>
+  ['families', familyId, 'children', childId, 'transactions'];
+
 export const createFirestoreBackend = () => ({
+  // ---- auth ----
   subscribeToAuth(onUser) {
     return onAuthStateChanged(getAuthInstance(), onUser);
   },
@@ -58,43 +61,110 @@ export const createFirestoreBackend = () => ({
     return signOut(getAuthInstance());
   },
 
-  subscribeToTransactions(onData, onError) {
-    const transactionsQuery = query(
-      collection(getDb(), COLLECTION),
-      orderBy('timestamp', 'desc')
+  // ---- family ----
+  /**
+   * Membership lives on the family document as an array of parent uids, and
+   * is found with an array-contains query on an automatic single-field index.
+   *
+   * The earlier design put membership in a subcollection written alongside the
+   * family in one batch. That cannot be secured: rules evaluate a batched
+   * write against the state *before* the batch, so the membership document
+   * could not verify the family it belonged to - which would have meant
+   * allowing anyone to add themselves as a parent of any family.
+   */
+  subscribeToFamily(uid, onData, onError) {
+    const familiesQuery = query(
+      collection(getDb(), 'families'),
+      where('parentUids', 'array-contains', uid)
     );
     return onSnapshot(
-      transactionsQuery,
-      (snapshot) => onData(snapshot.docs.map(toTransaction)),
+      familiesQuery,
+      (snapshot) => {
+        const first = snapshot.docs[0];
+        onData(first ? { id: first.id, ...first.data() } : null);
+      },
       onError
     );
   },
 
-  updateTransaction(id, { amountMinor, comment, category, editedBy, editedByName }) {
-    // user and timestamp are deliberately not sent: the rules pin them to
-    // their existing values, so an edit cannot rewrite authorship or date.
-    return updateDoc(doc(getDb(), COLLECTION, id), {
-      amountMinor,
-      comment,
-      category,
-      editedBy,
-      editedByName: editedByName ?? null,
-      editedAt: serverTimestamp(),
+  async createFamily({ uid, name, email, displayName }) {
+    const familyRef = doc(collection(getDb(), 'families'));
+    await setDoc(familyRef, {
+      name,
+      createdBy: uid,
+      createdAt: serverTimestamp(),
+      parentUids: [uid],
+      parents: { [uid]: { email, displayName: displayName ?? null } },
     });
+    return familyRef.id;
   },
 
-  deleteTransaction(id) {
-    return deleteDoc(doc(getDb(), COLLECTION, id));
+  // ---- children ----
+  subscribeToChildren(familyId, onData, onError) {
+    const childrenQuery = query(
+      collection(getDb(), 'families', familyId, 'children'),
+      orderBy('createdAt', 'asc')
+    );
+    return onSnapshot(
+      childrenQuery,
+      (snapshot) =>
+        onData(snapshot.docs.map((child) => ({ id: child.id, name: child.data().name }))),
+      onError
+    );
   },
 
-  addTransaction({ amountMinor, comment, category, user, userName }) {
-    return addDoc(collection(getDb(), COLLECTION), {
-      amountMinor,
-      comment,
-      category,
-      user,
-      userName: userName ?? null,
-      timestamp: serverTimestamp(),
+  async addChild(familyId, { name }) {
+    const created = await addDoc(collection(getDb(), 'families', familyId, 'children'), {
+      name,
+      createdAt: serverTimestamp(),
     });
+    return created.id;
+  },
+
+  // ---- one child's ledger ----
+  ledgerFor(familyId, childId) {
+    const path = transactionsPath(familyId, childId);
+
+    return {
+      subscribeToTransactions(onData, onError) {
+        const transactionsQuery = query(
+          collection(getDb(), ...path),
+          orderBy('timestamp', 'desc')
+        );
+        return onSnapshot(
+          transactionsQuery,
+          (snapshot) => onData(snapshot.docs.map(toTransaction)),
+          onError
+        );
+      },
+
+      addTransaction({ amountMinor, comment, category, user, userName }) {
+        return addDoc(collection(getDb(), ...path), {
+          amountMinor,
+          comment,
+          category,
+          user,
+          userName: userName ?? null,
+          timestamp: serverTimestamp(),
+        });
+      },
+
+      updateTransaction(id, { amountMinor, comment, category, editedBy, editedByName }) {
+        // user and timestamp are deliberately not sent: the rules pin them to
+        // their existing values, so an edit cannot rewrite authorship or date.
+        return updateDoc(doc(getDb(), ...path, id), {
+          amountMinor,
+          comment,
+          category,
+          editedBy,
+          editedByName: editedByName ?? null,
+          editedAt: serverTimestamp(),
+        });
+      },
+
+      deleteTransaction(id) {
+        return deleteDoc(doc(getDb(), ...path, id));
+      },
+    };
   },
 });
