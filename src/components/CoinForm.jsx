@@ -1,33 +1,51 @@
 import {Button, FormGroup, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader} from "reactstrap";
 import {useState} from "react";
-import {collection, addDoc, serverTimestamp} from "firebase/firestore";
-import {db} from "../firebase.js";
+import {getBackend} from "../data/index.js";
 
-export const CoinForm = ({ isOpen, toggle, user }) => {
+/**
+ * Coins are whole units. Returns null for anything we refuse to write, so the
+ * client and the Firestore rule (`amount is int`) agree on what is valid.
+ */
+const parseAmount = (raw) => {
+    const trimmed = String(raw).trim();
+    if (trimmed === '') return null;
+    const value = Number(trimmed);
+    if (!Number.isInteger(value) || value === 0) return null;
+    return value;
+};
+
+export const CoinForm = ({ isOpen, toggle, user, backend = getBackend() }) => {
 
     const [amount, setAmount] = useState('');
     const [comment, setComment] = useState('');
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
 
     const handleSubmit = async () => {
-        if (!amount || isNaN(parseInt(amount))) return alert('Enter a valid number');
-        if (!user) return alert('You must be logged in');
+        const parsedAmount = parseAmount(amount);
+        if (parsedAmount === null) {
+            setError('Enter a non-zero whole number of coins.');
+            return;
+        }
+        if (!user) {
+            setError('You must be signed in to add a transaction.');
+            return;
+        }
 
         setLoading(true);
+        setError(null);
         try {
-            await addDoc(collection(db, 'transactions'), {
-                amount: parseInt(amount),
-                comment: comment,
+            await backend.addTransaction({
+                amount: parsedAmount,
+                comment,
                 user: user.email,
-                timestamp: serverTimestamp()
             });
             setAmount('');
             setComment('');
             toggle();
         }
-        catch (e) {
-            console.log(e);
-            alert('Failed to add transaction');
+        catch {
+            setError('Could not save that transaction. Please try again.');
         }
         finally {
             setLoading(false);
@@ -48,6 +66,7 @@ export const CoinForm = ({ isOpen, toggle, user }) => {
                     <Input type="text" id="comment" value={comment}
                            onChange={e => setComment(e.target.value)} />
                 </FormGroup>
+                {error && <div role="alert" className="text-danger">{error}</div>}
             </ModalBody>
             <ModalFooter>
                 <Button color="primary" onClick={handleSubmit} disabled={loading}>

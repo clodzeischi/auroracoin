@@ -1,30 +1,19 @@
 import {Table} from "reactstrap";
 import {TableRow} from "./TableRow.jsx";
-import {useEffect, useState} from "react";
-import {collection, query, orderBy, onSnapshot} from "firebase/firestore";
-import {db} from "../firebase.js";
+import {useTransactions} from "../hooks/useTransactions.js";
+
+const formatTime = (timestamp) => timestamp ? timestamp.toLocaleString() : 'N/A';
 
 export const CoinTable = () => {
 
-    const [transactions, setTransactions] = useState([]);
+    const { transactions, loading, error } = useTransactions();
 
-    useEffect(() => {
-        const q = query(collection(db, 'transactions'), orderBy('timestamp', 'desc'));
-        const unsubscribe = onSnapshot(q, snapshot => {
-            const data = snapshot.docs.map(doc => {
-                const tx = doc.data();
-                return {
-                    amount: tx.amount,
-                    time: tx.timestamp ? tx.timestamp.toDate().toLocaleString() : 'N/A',
-                    user: tx.user || 'N/A',
-                    comment: tx.comment || 'N/A',
-                };
-            });
-            setTransactions(data);
-        });
-
-        return () => unsubscribe();
-    }, []);
+    if (error) {
+        return <p className="text-danger">Couldn't load transactions.</p>;
+    }
+    if (loading) {
+        return <p>Loading transactions...</p>;
+    }
 
     return (
         <Table striped>
@@ -37,7 +26,17 @@ export const CoinTable = () => {
                 </tr>
             </thead>
             <tbody>
-                {transactions.map( (predicate, index) => (<TableRow key={index} data={predicate}/>))}
+                {transactions.map((transaction) => (
+                    <TableRow
+                        key={transaction.id}
+                        data={{
+                            amount: transaction.amount,
+                            time: formatTime(transaction.timestamp),
+                            user: transaction.user || 'N/A',
+                            comment: transaction.comment || 'N/A',
+                        }}
+                    />
+                ))}
             </tbody>
         </Table>
     )

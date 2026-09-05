@@ -2,7 +2,7 @@ import {Button, Navbar, NavbarBrand} from "reactstrap";
 import {useState} from "react";
 import {CoinForm} from "./CoinForm.jsx";
 
-export const Header = ({user, login, logout}) => {
+export const Header = ({user, loading, login, logout}) => {
 
     const [modalOpen, setModalOpen] = useState(false);
 
@@ -13,7 +13,9 @@ export const Header = ({user, login, logout}) => {
                     <img className='mx-2' alt="logo" src="/favicon.ico" style={{height: 40, width: 40}}/>
                     AuroraCoin
                 </NavbarBrand>
-                { user ? (
+                {/* While auth is resolving, render nothing rather than flashing
+                    a Login button at someone who is already signed in. */}
+                { loading ? null : user ? (
                     <>
                         <Button color='primary' onClick={() => {setModalOpen(true)}}>Add item</Button>
                         <Button color='secondary' onClick={logout}>Logout</Button>
