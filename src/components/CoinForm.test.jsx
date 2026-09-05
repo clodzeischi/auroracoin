@@ -11,7 +11,7 @@ const setup = (props = {}) => {
     <CoinForm
       isOpen
       toggle={toggle}
-      user={{ email: 'parent@example.com' }}
+      user={{ email: 'parent@example.com', displayName: 'Constantin' }}
       backend={backend}
       {...props}
     />
@@ -150,6 +150,7 @@ describe('CoinForm', () => {
       comment: 'birthday',
       category: 'gift',
       user: 'parent@example.com',
+      userName: 'Constantin',
     });
   });
 

@@ -72,6 +72,7 @@ export const CoinForm = ({ isOpen, toggle, user, backend = getBackend(), transac
                     comment,
                     category,
                     editedBy: user.email,
+                    editedByName: user.displayName ?? null,
                 });
             } else {
                 await backend.addTransaction({
@@ -79,6 +80,7 @@ export const CoinForm = ({ isOpen, toggle, user, backend = getBackend(), transac
                     comment,
                     category,
                     user: user.email,
+                    userName: user.displayName ?? null,
                 });
                 setAmount('');
                 setCategory('');

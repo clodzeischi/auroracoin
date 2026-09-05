@@ -5,7 +5,7 @@ import {ConfirmDialog} from "./ConfirmDialog.jsx";
 import {useTransactions} from "../hooks/useTransactions.js";
 import {getBackend} from "../data/index.js";
 import {categoryLabel} from "../data/categories.js";
-import {formatEditedNote} from "../utils/format.js";
+import {formatEditedNote, personLabel} from "../utils/format.js";
 import {formatMinorSigned} from "../utils/money.js";
 import {isChild} from "../data/roles.js";
 
@@ -68,7 +68,7 @@ export const CoinTable = ({ backend, user }) => {
                                         display: formatMinorSigned(transaction.amountMinor),
                                         category: categoryLabel(transaction.category),
                                         time: formatTime(transaction.timestamp),
-                                        user: transaction.user || '—',
+                                        user: personLabel(transaction.userName, transaction.user),
                                         comment: transaction.comment || '—',
                                         editedNote: readOnly ? null : formatEditedNote(transaction),
                                     }}

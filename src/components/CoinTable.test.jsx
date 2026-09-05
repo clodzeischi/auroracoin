@@ -18,7 +18,7 @@ const tx = (over = {}) => ({
 
 const setup = (transactions = [tx()]) => {
   const backend = createFakeBackend();
-  render(<CoinTable backend={backend} user={{ email: 'parent2@example.com' }} />);
+  render(<CoinTable backend={backend} user={{ email: 'parent2@example.com', displayName: 'Deeanna' }} />);
   act(() => backend.emitTransactions(transactions));
   return { backend, user: userEvent.setup() };
 };
@@ -62,6 +62,7 @@ describe('CoinTable', () => {
       comment: 'tidied her room',
       category: 'chores',
       editedBy: 'parent2@example.com',
+      editedByName: 'Deeanna',
     });
     expect(backend.addTransaction).not.toHaveBeenCalled();
   });

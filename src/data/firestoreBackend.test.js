@@ -62,6 +62,7 @@ describe('createFirestoreBackend', () => {
           comment: 'tidied her room',
           category: 'chores',
           user: 'parent@example.com',
+          userName: 'Constantin',
           timestamp: { toDate: () => new Date('2026-01-01T00:00:00Z') },
         }),
       ])
@@ -74,8 +75,10 @@ describe('createFirestoreBackend', () => {
         comment: 'tidied her room',
         category: 'chores',
         user: 'parent@example.com',
+        userName: 'Constantin',
         timestamp: new Date('2026-01-01T00:00:00Z'),
         editedBy: null,
+        editedByName: null,
         editedAt: null,
       },
     ]);
@@ -114,6 +117,7 @@ describe('createFirestoreBackend', () => {
       comment: 'birthday',
       category: 'gift',
       user: 'parent@example.com',
+      userName: 'Constantin',
     });
 
     expect(serverTimestamp).toHaveBeenCalled();
@@ -122,6 +126,7 @@ describe('createFirestoreBackend', () => {
       comment: 'birthday',
       category: 'gift',
       user: 'parent@example.com',
+      userName: 'Constantin',
       timestamp: '__SERVER_TIMESTAMP__',
     });
   });
@@ -166,6 +171,7 @@ describe('createFirestoreBackend', () => {
       comment: 'fixed',
       category: 'chores',
       editedBy: 'parent2@example.com',
+      editedByName: 'Deeanna',
     });
 
     expect(doc).toHaveBeenCalledWith(expect.anything(), 'transactions', 'abc123');
@@ -174,6 +180,7 @@ describe('createFirestoreBackend', () => {
       comment: 'fixed',
       category: 'chores',
       editedBy: 'parent2@example.com',
+      editedByName: 'Deeanna',
       editedAt: '__SERVER_TIMESTAMP__',
     });
   });

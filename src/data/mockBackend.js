@@ -22,6 +22,7 @@ const seedTransactions = () => [
     comment: 'Tidied her room all week',
     category: 'chores',
     user: 'parent@example.com',
+    userName: 'Constantin',
     timestamp: new Date('2026-01-05T09:00:00Z'),
   },
   {
@@ -30,6 +31,7 @@ const seedTransactions = () => [
     comment: 'Spent on stickers',
     category: 'treats',
     user: 'parent@example.com',
+    userName: 'Constantin',
     timestamp: new Date('2026-01-11T17:30:00Z'),
   },
   {
@@ -38,6 +40,7 @@ const seedTransactions = () => [
     comment: 'Birthday from Grandma',
     category: 'gift',
     user: 'otherparent@example.com',
+    userName: 'Deeanna',
     timestamp: new Date('2026-02-02T12:00:00Z'),
   },
 ];
@@ -87,11 +90,11 @@ export const createMockBackend = () => {
       return () => dataListeners.delete(onData);
     },
 
-    updateTransaction(id, { amountMinor, comment, category, editedBy }) {
+    updateTransaction(id, { amountMinor, comment, category, editedBy, editedByName }) {
       transactions = transactions.map((transaction) =>
         transaction.id === id
           // Spread first so author and timestamp survive the edit.
-          ? { ...transaction, amountMinor, comment, category, editedBy, editedAt: new Date() }
+          ? { ...transaction, amountMinor, comment, category, editedBy, editedByName, editedAt: new Date() }
           : transaction
       );
       notifyData();
@@ -104,10 +107,10 @@ export const createMockBackend = () => {
       return Promise.resolve();
     },
 
-    addTransaction({ amountMinor, comment, category, user: author }) {
+    addTransaction({ amountMinor, comment, category, user: author, userName }) {
       transactions = [
         ...transactions,
-        { id: nextId(), amountMinor, comment, category, user: author, timestamp: new Date() },
+        { id: nextId(), amountMinor, comment, category, user: author, userName, timestamp: new Date() },
       ];
       notifyData();
       return Promise.resolve();
