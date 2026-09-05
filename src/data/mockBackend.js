@@ -70,11 +70,14 @@ const seedTransactions = () => [
  * In-memory stand-in for the Firestore backend. Same interface, no network,
  * no credentials, no Firebase project. Used automatically in dev.
  */
+const normalizeEmail = (email) => String(email ?? '').trim().toLowerCase();
+
 export const createMockBackend = ({ seed = true } = {}) => {
   const families = new Map();          // familyId -> { id, name, createdBy }
   const memberships = new Map();       // uid -> Set(familyId)
   const children = new Map();          // familyId -> [{ id, name }]
   const ledgers = new Map();           // `${familyId}/${childId}` -> transactions[]
+  const invites = new Map();           // email -> { email, familyId, invitedByName }
 
   let user = null;
   const authListeners = new Set();
@@ -94,10 +97,20 @@ export const createMockBackend = ({ seed = true } = {}) => {
     return families.get([...ids][0]) ?? null;
   };
 
+  const inviteListeners = new Map();   // email -> Set(cb)
+  const pendingListeners = new Map();  // familyId -> Set(cb)
+
   const notifyAuth = () => authListeners.forEach((l) => l(user));
   const notifyFamily = (uid) => listenersFor(familyListeners, uid).forEach((l) => l(familyOf(uid)));
   const notifyChildren = (familyId) =>
     listenersFor(childListeners, familyId).forEach((l) => l([...(children.get(familyId) ?? [])]));
+
+  const notifyInvite = (email) =>
+    listenersFor(inviteListeners, email).forEach((l) => l(invites.get(email) ?? null));
+  const notifyPending = (familyId) =>
+    listenersFor(pendingListeners, familyId).forEach((l) =>
+      l([...invites.values()].filter((invite) => invite.familyId === familyId))
+    );
 
   const newestFirst = (list) =>
     [...list].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
@@ -106,7 +119,7 @@ export const createMockBackend = ({ seed = true } = {}) => {
     listenersFor(ledgerListeners, key(familyId, childId)).forEach((l) => l(rows));
   };
 
-  if (seed) {
+  const applySeed = () => {
     families.set(MOCK_FAMILY_ID, {
       id: MOCK_FAMILY_ID,
       name: 'The Aurora House',
@@ -132,7 +145,28 @@ export const createMockBackend = ({ seed = true } = {}) => {
         editedAt: null,
       },
     ]);
-  }
+  };
+
+  const clearAll = () => {
+    families.clear();
+    memberships.clear();
+    children.clear();
+    ledgers.clear();
+    invites.clear();
+  };
+
+  if (seed) applySeed();
+
+  const notifyEverything = () => {
+    [...familyListeners.keys()].forEach(notifyFamily);
+    [...childListeners.keys()].forEach(notifyChildren);
+    [...inviteListeners.keys()].forEach(notifyInvite);
+    [...pendingListeners.keys()].forEach(notifyPending);
+    [...ledgerListeners.keys()].forEach((id) => {
+      const [familyId, childId] = id.split('/');
+      notifyLedger(familyId, childId);
+    });
+  };
 
   return {
     // ---- auth ----
@@ -189,6 +223,74 @@ export const createMockBackend = ({ seed = true } = {}) => {
       ledgers.set(key(familyId, childId), []);
       notifyChildren(familyId);
       return Promise.resolve(childId);
+    },
+
+    renameChild(familyId, childId, name) {
+      children.set(familyId, (children.get(familyId) ?? []).map((child) =>
+        child.id === childId ? { ...child, name } : child
+      ));
+      notifyChildren(familyId);
+      return Promise.resolve();
+    },
+
+    deleteChild(familyId, childId) {
+      children.set(familyId, (children.get(familyId) ?? []).filter((c) => c.id !== childId));
+      // Nothing cascades in Firestore, so the ledger goes explicitly.
+      ledgers.delete(key(familyId, childId));
+      notifyChildren(familyId);
+      notifyLedger(familyId, childId);
+      return Promise.resolve();
+    },
+
+    // ---- inviting a second parent ----
+    subscribeToInvite(email, onData) {
+      const address = normalizeEmail(email);
+      const listeners = listenersFor(inviteListeners, address);
+      listeners.add(onData);
+      onData(invites.get(address) ?? null);
+      return () => listeners.delete(onData);
+    },
+
+    subscribeToPendingInvites(familyId, onData) {
+      const listeners = listenersFor(pendingListeners, familyId);
+      listeners.add(onData);
+      onData([...invites.values()].filter((invite) => invite.familyId === familyId));
+      return () => listeners.delete(onData);
+    },
+
+    inviteParent(familyId, { email, invitedByName }) {
+      const address = normalizeEmail(email);
+      invites.set(address, { email: address, familyId, invitedByName });
+      notifyInvite(address);
+      notifyPending(familyId);
+      return Promise.resolve();
+    },
+
+    cancelInvite(email) {
+      const address = normalizeEmail(email);
+      const invite = invites.get(address);
+      invites.delete(address);
+      notifyInvite(address);
+      if (invite) notifyPending(invite.familyId);
+      return Promise.resolve();
+    },
+
+    acceptInvite(familyId, { uid, email }) {
+      const address = normalizeEmail(email);
+      memberships.set(uid, new Set([...(memberships.get(uid) ?? []), familyId]));
+      invites.delete(address);
+      notifyFamily(uid);
+      notifyInvite(address);
+      notifyPending(familyId);
+      return Promise.resolve();
+    },
+
+    // ---- dev only: walk onboarding against an empty household ----
+    resetForDev({ seed: reseed = false } = {}) {
+      clearAll();
+      if (reseed) applySeed();
+      notifyEverything();
+      return Promise.resolve();
     },
 
     // ---- one child's ledger; the shape components already consume ----

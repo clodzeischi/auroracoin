@@ -8,6 +8,9 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  getDocs,
+  writeBatch,
+  arrayUnion,
   where,
   serverTimestamp,
 } from 'firebase/firestore';
@@ -43,6 +46,8 @@ const toTransaction = (snapshot) => {
     editedAt: data.editedAt ? data.editedAt.toDate() : null,
   };
 };
+
+const normalizeEmail = (email) => String(email ?? '').trim().toLowerCase();
 
 const transactionsPath = (familyId, childId) =>
   ['families', familyId, 'children', childId, 'transactions'];
@@ -119,6 +124,84 @@ export const createFirestoreBackend = () => ({
       createdAt: serverTimestamp(),
     });
     return created.id;
+  },
+
+  renameChild(familyId, childId, name) {
+    return updateDoc(doc(getDb(), 'families', familyId, 'children', childId), { name });
+  },
+
+  /**
+   * Firestore does not cascade deletes without server code, so a child's
+   * transactions would linger as an invisible orphaned subcollection. They
+   * are removed explicitly, in batches, before the child itself.
+   */
+  async deleteChild(familyId, childId) {
+    const db = getDb();
+    const path = transactionsPath(familyId, childId);
+    const existing = await getDocs(collection(db, ...path));
+
+    const documents = existing.docs;
+    for (let index = 0; index < documents.length; index += 400) {
+      const batch = writeBatch(db);
+      documents.slice(index, index + 400).forEach((entry) => batch.delete(entry.ref));
+      await batch.commit();
+    }
+
+    await deleteDoc(doc(db, 'families', familyId, 'children', childId));
+  },
+
+  // ---- inviting a second parent ----
+  /**
+   * Keyed by email address, because a person's uid cannot be known until they
+   * have signed in at least once - which is exactly the case an invite exists
+   * to cover. The address is lower-cased so it matches however it was typed.
+   */
+  subscribeToInvite(email, onData, onError) {
+    return onSnapshot(
+      doc(getDb(), 'invites', normalizeEmail(email)),
+      (snapshot) => onData(snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null),
+      onError
+    );
+  },
+
+  subscribeToPendingInvites(familyId, onData, onError) {
+    const pending = query(collection(getDb(), 'invites'), where('familyId', '==', familyId));
+    return onSnapshot(
+      pending,
+      (snapshot) => onData(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }))),
+      onError
+    );
+  },
+
+  inviteParent(familyId, { email, invitedByName }) {
+    const address = normalizeEmail(email);
+    return setDoc(doc(getDb(), 'invites', address), {
+      email: address,
+      familyId,
+      invitedByName: invitedByName ?? null,
+      createdAt: serverTimestamp(),
+    });
+  },
+
+  cancelInvite(email) {
+    return deleteDoc(doc(getDb(), 'invites', normalizeEmail(email)));
+  },
+
+  /**
+   * Joining and consuming the invite happen together: a partial commit would
+   * either leave a replayable invite or add a parent who never had one.
+   */
+  acceptInvite(familyId, { uid, email, displayName }) {
+    const db = getDb();
+    const address = normalizeEmail(email);
+
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'families', familyId), {
+      parentUids: arrayUnion(uid),
+      [`parents.${uid}`]: { email: address, displayName: displayName ?? null },
+    });
+    batch.delete(doc(db, 'invites', address));
+    return batch.commit();
   },
 
   // ---- one child's ledger ----

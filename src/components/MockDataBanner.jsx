@@ -30,6 +30,21 @@ export const MockDataBanner = ({ user }) => {
                 >
                     Child
                 </button>
+                {/* Clears the seeded household so onboarding can be walked. */}
+                <button
+                    type="button"
+                    className="persona"
+                    onClick={() => getBackend().resetForDev({ seed: false })}
+                >
+                    Fresh start
+                </button>
+                <button
+                    type="button"
+                    className="persona"
+                    onClick={() => getBackend().resetForDev({ seed: true })}
+                >
+                    Reseed
+                </button>
             </span>
         </div>
     );

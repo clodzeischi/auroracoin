@@ -3,10 +3,13 @@ import { Header } from "./components/Header.jsx";
 import { Intro } from "./components/Intro.jsx";
 import { Onboarding } from "./components/Onboarding.jsx";
 import { FamilyDashboard } from "./components/FamilyDashboard.jsx";
+import { AcceptInvite } from "./components/AcceptInvite.jsx";
 import { ChildLedger } from "./components/ChildLedger.jsx";
 import { MockDataBanner } from "./components/MockDataBanner.jsx";
 import { useAuth } from "./hooks/useAuth.js";
 import { useFamily } from "./hooks/useFamily.js";
+import { useInvite } from "./hooks/useInvite.js";
+import { usePendingInvites } from "./hooks/usePendingInvites.js";
 import { getBackend } from "./data/index.js";
 import { isChild } from "./data/roles.js";
 
@@ -15,8 +18,13 @@ export const App = () => {
     const { user, loading: authLoading, login, logout } = useAuth(backend);
     const { family, children, loading: familyLoading } = useFamily(backend, user);
 
+    const invite = useInvite(backend, user?.email ?? null);
+    const pendingInvites = usePendingInvites(backend, family?.id ?? null);
+
     const [selectedChildId, setSelectedChildId] = useState(null);
     const [addingChild, setAddingChild] = useState(false);
+    const [joining, setJoining] = useState(false);
+    const [declinedInvite, setDeclinedInvite] = useState(false);
 
     // Selecting a child pushes history, so the phone's back gesture returns to
     // the family view instead of leaving the app.
@@ -60,6 +68,26 @@ export const App = () => {
 
     if (familyLoading) return shell(<p className="state">Loading…</p>);
 
+    // Someone invited to a family they have not joined yet is offered that
+    // before being walked through creating one of their own.
+    if (!family && invite && !declinedInvite) {
+        return shell(
+            <AcceptInvite
+                invite={invite}
+                busy={joining}
+                onAccept={async () => {
+                    setJoining(true);
+                    try {
+                        await backend.acceptInvite(invite.familyId, user);
+                    } finally {
+                        setJoining(false);
+                    }
+                }}
+                onDecline={() => setDeclinedInvite(true)}
+            />
+        );
+    }
+
     // No family, no children, or explicitly adding one: onboarding.
     if (!family || children.length === 0 || addingChild) {
         return shell(
@@ -75,6 +103,7 @@ export const App = () => {
                 }
                 onAddChild={(name) => backend.addChild(family.id, { name })}
                 onDone={() => setAddingChild(false)}
+                onCancel={addingChild ? () => setAddingChild(false) : undefined}
             />
         );
     }
@@ -99,6 +128,16 @@ export const App = () => {
             ledgerFor={(childId) => backend.ledgerFor(family.id, childId)}
             onOpenChild={openChild}
             onAddChild={() => setAddingChild(true)}
+            onRenameChild={(childId, name) => backend.renameChild(family.id, childId, name)}
+            onDeleteChild={(childId) => backend.deleteChild(family.id, childId)}
+            pendingInvites={pendingInvites}
+            onInvite={(email) =>
+                backend.inviteParent(family.id, {
+                    email,
+                    invitedByName: user.displayName ?? user.email,
+                })
+            }
+            onCancelInvite={(email) => backend.cancelInvite(email)}
         />
     );
 }

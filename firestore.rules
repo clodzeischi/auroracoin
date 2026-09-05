@@ -33,6 +33,31 @@ service cloud.firestore {
       return isParentOf(fid) || (signedIn() && pairedChildId(fid) == cid);
     }
 
+    function inviteFor(email) {
+      return get(/databases/$(database)/documents/invites/$(email)).data;
+    }
+
+    function hasInviteTo(fid) {
+      return verifiedEmail()
+        && exists(/databases/$(database)/documents/invites/$(request.auth.token.email))
+        && inviteFor(request.auth.token.email).familyId == fid;
+    }
+
+    /**
+     * An invitee is not yet a parent, so they cannot pass isParentOf. This
+     * lets them add themselves - and only themselves - to a family they hold
+     * an invite for, changing nothing else about it.
+     */
+    function isAcceptingInvite(fid) {
+      return hasInviteTo(fid)
+        && request.resource.data.parentUids.toSet()
+             == resource.data.parentUids.toSet().union([request.auth.uid].toSet())
+        && request.resource.data.parents.diff(resource.data.parents).affectedKeys()
+             == [request.auth.uid].toSet()
+        && request.resource.data.name == resource.data.name
+        && request.resource.data.createdBy == resource.data.createdBy;
+    }
+
     function isValidName(value, maxLength) {
       return value is string && value.size() > 0 && value.size() <= maxLength;
     }
@@ -104,10 +129,11 @@ service cloud.firestore {
       // An existing parent may rename the family, invite another parent, or
       // pair a child device - but never remove themselves from it, which
       // would strand the family with no one able to administer it.
-      allow update: if isParentOf(fid)
-        && request.auth.uid in request.resource.data.parentUids
-        && request.resource.data.createdBy == resource.data.createdBy
-        && isValidName(request.resource.data.name, 60);
+      allow update: if (isParentOf(fid)
+          && request.auth.uid in request.resource.data.parentUids
+          && request.resource.data.createdBy == resource.data.createdBy
+          && isValidName(request.resource.data.name, 60))
+        || isAcceptingInvite(fid);
 
       allow delete: if false;
 
@@ -123,6 +149,30 @@ service cloud.firestore {
           allow delete: if isParentOf(fid);
         }
       }
+    }
+
+    /**
+     * Invites are keyed by the invited email address, because a uid cannot be
+     * known before that person has ever signed in.
+     */
+    match /invites/{email} {
+      // The invitee reads their own invite; a parent of the family sees the
+      // ones they have outstanding.
+      allow read: if signedIn()
+        && (request.auth.token.get('email', '') == email
+            || request.auth.uid in familyData(resource.data.familyId).parentUids);
+
+      allow create: if verifiedEmail()
+        && request.auth.uid in familyData(request.resource.data.familyId).parentUids
+        && request.resource.data.email == email
+        && email.matches('^[^@]+@[^@]+[.][^@]+$');
+
+      // Cancelled by a parent, or consumed by the person it was addressed to.
+      allow delete: if signedIn()
+        && (request.auth.token.get('email', '') == email
+            || request.auth.uid in familyData(resource.data.familyId).parentUids);
+
+      allow update: if false;
     }
 
     // Everything outside a family is denied by default.

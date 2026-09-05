@@ -7,16 +7,34 @@ import { formatMinor } from '../utils/money.js';
 /**
  * One child, in aggregate. Owns its own subscription so the number of
  * children is not something the parent view has to orchestrate.
+ *
+ * The card is a region rather than a button: it has to contain rename and
+ * delete controls, and buttons cannot nest. The child's name is the control
+ * that opens the account, so a keyboard still reaches it.
  */
-export const ChildSummaryCard = ({ child, ledger, now, onOpen }) => {
+export const ChildSummaryCard = ({ child, ledger, now, onOpen, onRename, onDelete }) => {
     const { transactions, loading, error } = useTransactions(ledger);
     const summary = useMemo(() => childSummary(transactions, now), [transactions, now]);
 
+    const stop = (handler) => (event) => {
+        event.stopPropagation();
+        handler();
+    };
+
     return (
-        <button type="button" className="child-card" onClick={onOpen} aria-label={`Open ${child.name}'s account`}>
+        <section className="child-card" aria-label={`${child.name}'s account`} onClick={onOpen}>
             <div className="child-card-head">
-                <span className="child-name">{child.name}</span>
-                <span className="child-balance">{loading ? '—' : formatMinor(summary.balanceMinor)}</span>
+                <button
+                    type="button"
+                    className="child-name"
+                    aria-label={`Open ${child.name}'s account`}
+                    onClick={stop(onOpen)}
+                >
+                    {child.name}
+                </button>
+                <span className="child-balance">
+                    {loading ? '—' : formatMinor(summary.balanceMinor)}
+                </span>
             </div>
 
             {error ? (
@@ -35,6 +53,25 @@ export const ChildSummaryCard = ({ child, ledger, now, onOpen }) => {
                     .
                 </p>
             )}
-        </button>
+
+            <div className="child-card-actions">
+                <button
+                    type="button"
+                    className="link-btn"
+                    aria-label={`Rename ${child.name}`}
+                    onClick={stop(onRename)}
+                >
+                    Rename
+                </button>
+                <button
+                    type="button"
+                    className="link-btn is-danger"
+                    aria-label={`Delete ${child.name}'s account`}
+                    onClick={stop(onDelete)}
+                >
+                    Delete
+                </button>
+            </div>
+        </section>
     );
 };

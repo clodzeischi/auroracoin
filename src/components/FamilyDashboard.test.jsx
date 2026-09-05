@@ -20,23 +20,32 @@ const tx = (amountMinor, category, iso) => ({
   timestamp: new Date(iso),
 });
 
-const setup = (children = CHILDREN) => {
+const setup = (children = CHILDREN, overrides = {}) => {
   const ledgers = new Map(children.map((c) => [c.id, createFakeBackend()]));
-  const onOpenChild = vi.fn();
+  const handlers = {
+    onOpenChild: vi.fn(),
+    onAddChild: vi.fn(),
+    onRenameChild: vi.fn(() => Promise.resolve()),
+    onDeleteChild: vi.fn(() => Promise.resolve()),
+    onInvite: vi.fn(() => Promise.resolve()),
+    onCancelInvite: vi.fn(() => Promise.resolve()),
+    ...overrides,
+  };
   render(
     <FamilyDashboard
       family={FAMILY}
       children={children}
       ledgerFor={(id) => ledgers.get(id)}
       now={NOW}
-      onOpenChild={onOpenChild}
-      onAddChild={vi.fn()}
+      pendingInvites={overrides.pendingInvites ?? []}
+      {...handlers}
     />
   );
-  return { ledgers, onOpenChild, user: userEvent.setup() };
+  return { ledgers, ...handlers, user: userEvent.setup() };
 };
 
-const cardFor = (name) => screen.getByRole('button', { name: new RegExp(`open ${name}`, 'i') });
+const cardFor = (name) => screen.getByRole('region', { name: new RegExp(`${name}'s account`, 'i') });
+const openButton = (name) => screen.getByRole('button', { name: new RegExp(`open ${name}`, 'i') });
 
 describe('FamilyDashboard', () => {
   it('names the family and how many accounts it holds', () => {
@@ -114,10 +123,10 @@ describe('FamilyDashboard', () => {
     expect(within(cardFor('Wren')).getByText('20.00')).toBeInTheDocument();
   });
 
-  it('opens a child\'s account when their card is used', async () => {
+  it('opens a child\'s account from their name', async () => {
     const { onOpenChild, user } = setup();
 
-    await user.click(cardFor('Wren'));
+    await user.click(openButton('Wren'));
 
     expect(onOpenChild).toHaveBeenCalledWith('c2');
   });
@@ -135,5 +144,100 @@ describe('FamilyDashboard', () => {
 
     expect(within(cardFor('Sparrow')).getByText(/couldn't load/i)).toBeInTheDocument();
     expect(within(cardFor('Wren')).getByText('20.00')).toBeInTheDocument();
+  });
+
+  describe('managing children', () => {
+    it('renames a child through a prefilled prompt', async () => {
+      const { onRenameChild, user } = setup();
+
+      await user.click(screen.getByRole('button', { name: /rename sparrow/i }));
+      const field = screen.getByLabelText(/nickname/i);
+      expect(field).toHaveValue('Sparrow');
+
+      await user.clear(field);
+      await user.type(field, 'Sparrowhawk');
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+
+      expect(onRenameChild).toHaveBeenCalledWith('c1', 'Sparrowhawk');
+    });
+
+    it('will not rename to nothing', async () => {
+      const { onRenameChild, user } = setup();
+
+      await user.click(screen.getByRole('button', { name: /rename sparrow/i }));
+      await user.clear(screen.getByLabelText(/nickname/i));
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+
+      expect(onRenameChild).not.toHaveBeenCalled();
+    });
+
+    it('asks before deleting, and says the history goes too', async () => {
+      const { onDeleteChild, user } = setup();
+
+      await user.click(screen.getByRole('button', { name: /delete sparrow's account/i }));
+
+      const dialog = screen.getByRole('alertdialog');
+      expect(dialog).toHaveTextContent(/permanently removed/i);
+      expect(onDeleteChild).not.toHaveBeenCalled();
+    });
+
+    it('deletes once confirmed', async () => {
+      const { onDeleteChild, user } = setup();
+
+      await user.click(screen.getByRole('button', { name: /delete sparrow's account/i }));
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: /delete account/i }));
+
+      expect(onDeleteChild).toHaveBeenCalledWith('c1');
+    });
+
+    it('keeps the child when the confirmation is dismissed', async () => {
+      const { onDeleteChild, user } = setup();
+
+      await user.click(screen.getByRole('button', { name: /delete sparrow's account/i }));
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: /cancel/i }));
+
+      expect(onDeleteChild).not.toHaveBeenCalled();
+    });
+
+    it('does not open the account when a management control is used', async () => {
+      const { onOpenChild, user } = setup();
+
+      await user.click(screen.getByRole('button', { name: /rename sparrow/i }));
+
+      expect(onOpenChild).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('inviting a parent', () => {
+    it('invites by Google account email', async () => {
+      const { onInvite, user } = setup();
+
+      await user.type(screen.getByLabelText(/google account email/i), 'Deeanna@Example.com');
+      await user.click(screen.getByRole('button', { name: /send invite/i }));
+
+      expect(onInvite).toHaveBeenCalledWith('deeanna@example.com');
+    });
+
+    it('rejects something that is not an email address', async () => {
+      const { onInvite, user } = setup();
+
+      await user.type(screen.getByLabelText(/google account email/i), 'deeanna');
+      await user.click(screen.getByRole('button', { name: /send invite/i }));
+
+      expect(onInvite).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+
+    it('lists an outstanding invite and can cancel it', async () => {
+      const { onCancelInvite, user } = setup(CHILDREN, {
+        pendingInvites: [{ email: 'deeanna@example.com' }],
+      });
+
+      expect(screen.getByRole('list', { name: /pending invites/i })).toHaveTextContent('deeanna@example.com');
+
+      await user.click(screen.getByRole('button', { name: /cancel invite to/i }));
+
+      expect(onCancelInvite).toHaveBeenCalledWith('deeanna@example.com');
+    });
   });
 });

@@ -7,7 +7,7 @@ const PrivacyNotice = ({ children }) => (
     </div>
 );
 
-export const Onboarding = ({ family, onCreateFamily, onAddChild, onDone }) => {
+export const Onboarding = ({ family, onCreateFamily, onAddChild, onDone, onCancel }) => {
     const [name, setName] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
@@ -96,6 +96,11 @@ export const Onboarding = ({ family, onCreateFamily, onAddChild, onDone }) => {
                 </button>
                 {step === 'children' && added.length > 0 && (
                     <button className="btn btn-quiet" onClick={onDone}>Done</button>
+                )}
+                {/* Only offered when there is somewhere to go back to: during
+                    first-run there is no family view behind this yet. */}
+                {onCancel && added.length === 0 && (
+                    <button className="btn btn-quiet" onClick={onCancel}>Back</button>
                 )}
             </div>
         </main>
