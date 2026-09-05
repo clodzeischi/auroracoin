@@ -1,0 +1,49 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // The two people allowed to write to the ledger.
+    // email_verified guards against a future Email/Password provider being
+    // used to register one of these addresses without owning it.
+    function isLedgerOwner() {
+      return request.auth != null
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.email in [
+             'voxtel@gmail.com',
+             'deeanna.d.lodzeischi@gmail.com'
+           ];
+    }
+
+    // Shape of a transaction, enforced server-side so a malformed doc can
+    // never reach the client and break the running total in CoinCount.
+    function isValidTransaction() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['amount', 'comment', 'user', 'timestamp'])
+        && d.keys().hasAll(['amount', 'comment', 'user', 'timestamp'])
+        && d.amount is int
+        && d.comment is string
+        && d.comment.size() <= 500
+        // Pin the author to the caller's own identity: the client sends this
+        // field, so without this check an owner could attribute an entry to
+        // the other person.
+        && d.user == request.auth.token.email
+        // Forces serverTimestamp(); a client-chosen time is rejected.
+        && d.timestamp == request.time;
+    }
+
+    match /transactions/{transactionId} {
+      // Public by design: the running total and ledger are readable by
+      // anyone, including signed-out visitors. This is what keeps CoinCount
+      // working before login.
+      allow read: if true;
+
+      allow create: if isLedgerOwner() && isValidTransaction();
+      allow update: if isLedgerOwner() && isValidTransaction();
+      allow delete: if isLedgerOwner();
+    }
+
+    // Everything else is denied by default, rather than inheriting the
+    // previous catch-all match /{document=**}.
+  }
+}
