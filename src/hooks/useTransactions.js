@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getBackend } from '../data/index.js';
 
 // Summed in integer hundredths, so the total is exact. A single malformed
 // document must not turn the whole balance into NaN.
@@ -10,7 +9,7 @@ const sumAmounts = (transactions) =>
     0
   );
 
-export const useTransactions = (backend = getBackend()) => {
+export const useTransactions = (backend) => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

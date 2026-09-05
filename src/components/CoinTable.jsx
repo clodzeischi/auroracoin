@@ -3,7 +3,6 @@ import {TableRow} from "./TableRow.jsx";
 import {CoinForm} from "./CoinForm.jsx";
 import {ConfirmDialog} from "./ConfirmDialog.jsx";
 import {useTransactions} from "../hooks/useTransactions.js";
-import {getBackend} from "../data/index.js";
 import {categoryLabel} from "../data/categories.js";
 import {formatEditedNote, personLabel} from "../utils/format.js";
 import {formatMinorSigned} from "../utils/money.js";
@@ -17,15 +16,14 @@ const formatTime = (timestamp) =>
 export const CoinTable = ({ backend, user }) => {
 
     const readOnly = isChild(user);
-    const [resolvedBackend] = useState(() => backend ?? getBackend());
-    const { transactions, loading, error } = useTransactions(resolvedBackend);
+    const { transactions, loading, error } = useTransactions(backend);
     const [editing, setEditing] = useState(null);
     const [confirming, setConfirming] = useState(null);
 
     const confirmDelete = async () => {
         const target = confirming;
         setConfirming(null);
-        await resolvedBackend.deleteTransaction(target.id);
+        await backend.deleteTransaction(target.id);
     };
 
     return (
@@ -85,7 +83,7 @@ export const CoinTable = ({ backend, user }) => {
                 isOpen={Boolean(editing)}
                 toggle={() => setEditing(null)}
                 user={user}
-                backend={resolvedBackend}
+                backend={backend}
                 transaction={editing}
             />}
 

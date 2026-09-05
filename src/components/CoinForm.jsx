@@ -1,5 +1,4 @@
 import {useEffect, useRef, useState} from "react";
-import {getBackend} from "../data/index.js";
 import {categoriesForAmount} from "../data/categories.js";
 import {parseAmountInput, formatMinor} from "../utils/money.js";
 
@@ -7,7 +6,7 @@ import {parseAmountInput, formatMinor} from "../utils/money.js";
 // also what the Firestore rule validates (`amountMinor is int`).
 const parseAmount = parseAmountInput;
 
-export const CoinForm = ({ isOpen, toggle, user, backend = getBackend(), transaction = null }) => {
+export const CoinForm = ({ isOpen, toggle, user, backend, transaction = null }) => {
 
     const isEditing = Boolean(transaction);
     const [amount, setAmount] = useState(isEditing ? formatMinor(transaction.amountMinor) : '');

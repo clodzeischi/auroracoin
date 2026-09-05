@@ -13,6 +13,9 @@ const MOCK_CHILD_USER = {
   isAnonymous: true,
   displayName: 'Sparrow',
   role: 'child',
+  // In production these come from the family's childDevices map at pairing.
+  familyId: MOCK_FAMILY_ID,
+  childId: MOCK_CHILD_ID,
 };
 
 let idCounter = 0;

@@ -16,9 +16,10 @@ describe('Header', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('gives a parent the add and sign-out controls', () => {
+  it('gives a parent sign-out', () => {
+    // Adding a transaction lives on a child's page: it cannot exist without
+    // knowing whose ledger it belongs to.
     renderHeader({ user: { email: 'parent@example.com' } });
-    expect(screen.getByRole('button', { name: /add transaction/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument();
   });
 
@@ -27,7 +28,6 @@ describe('Header', () => {
     // pairing permanently and signing in would replace it. Neither is offered.
     renderHeader({ user: { isAnonymous: true } });
 
-    expect(screen.queryByRole('button', { name: /add transaction/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /sign out/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /sign in/i })).not.toBeInTheDocument();
   });
