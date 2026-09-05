@@ -14,11 +14,9 @@
     "verify": "yarn lint && yarn test && yarn build && yarn verify:build"
   },
   "dependencies": {
-    "bootstrap": "^5.3.8",
     "firebase": "^12.4.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "reactstrap": "^9.2.3"
+    "react-dom": "^19.1.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

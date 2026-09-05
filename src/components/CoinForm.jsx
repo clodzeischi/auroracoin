@@ -1,5 +1,4 @@
-import {Button, FormGroup, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader} from "reactstrap";
-import {useState} from "react";
+import {useEffect, useRef, useState} from "react";
 import {getBackend} from "../data/index.js";
 import {categoriesForAmount} from "../data/categories.js";
 
@@ -22,6 +21,21 @@ export const CoinForm = ({ isOpen, toggle, user, backend = getBackend() }) => {
     const [comment, setComment] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const amountRef = useRef(null);
+
+    // Escape closes, and the first field takes focus on open - both of which
+    // the component library used to provide.
+    useEffect(() => {
+        if (!isOpen) return undefined;
+        amountRef.current?.focus();
+        const onKeyDown = (event) => {
+            if (event.key === 'Escape') toggle();
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [isOpen, toggle]);
+
+    if (!isOpen) return null;
 
     const parsedAmount = parseAmount(amount);
     const categoryOptions = categoriesForAmount(parsedAmount);
@@ -73,44 +87,73 @@ export const CoinForm = ({ isOpen, toggle, user, backend = getBackend() }) => {
     }
 
     return (
-        <Modal isOpen={isOpen} toggle={toggle}>
-            <ModalHeader toggle={toggle}>Add transaction</ModalHeader>
-            <ModalBody>
-                <FormGroup>
-                    <Label for="amount">Amount</Label>
-                    <Input type="number" id="amount" value={amount}
-                           onChange={e => handleAmountChange(e.target.value)} />
-                </FormGroup>
-                <FormGroup>
-                    <Label for="category">Category</Label>
-                    <Input type="select" id="category" value={category}
-                           disabled={categoryOptions.length === 0}
-                           onChange={e => setCategory(e.target.value)}>
-                        <option value="">
-                            {categoryOptions.length === 0
-                                ? 'Enter an amount first'
-                                : 'Choose a category'}
-                        </option>
-                        {categoryOptions.map((option) => (
-                            <option key={option.id} value={option.id}>{option.label}</option>
-                        ))}
-                    </Input>
-                </FormGroup>
-                <FormGroup>
-                    <Label for="comment">Comment</Label>
-                    <Input type="text" id="comment" value={comment}
-                           onChange={e => setComment(e.target.value)} />
-                </FormGroup>
-                {error && <div role="alert" className="text-danger">{error}</div>}
-            </ModalBody>
-            <ModalFooter>
-                <Button color="primary" onClick={handleSubmit} disabled={loading}>
-                    {loading? 'Submitting...' : 'Submit'}
-                </Button>{' '}
-                <Button color="secondary" onClick={toggle}>
-                    Cancel
-                </Button>
-            </ModalFooter>
-        </Modal>
+        <div className="overlay" onMouseDown={toggle}>
+            <div
+                className="modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="coin-form-title"
+                onMouseDown={(e) => e.stopPropagation()}
+            >
+                <div className="modal-head">
+                    <h2 className="modal-title" id="coin-form-title">Add transaction</h2>
+                    <button className="modal-close" onClick={toggle} aria-label="Close">×</button>
+                </div>
+
+                <div className="modal-body">
+                    <div className="field">
+                        <label htmlFor="amount">Amount</label>
+                        <input
+                            ref={amountRef}
+                            type="number"
+                            id="amount"
+                            value={amount}
+                            onChange={e => handleAmountChange(e.target.value)}
+                        />
+                        <span className="field-hint">
+                            Positive to give coins, negative to spend them.
+                        </span>
+                    </div>
+
+                    <div className="field">
+                        <label htmlFor="category">Category</label>
+                        <select
+                            id="category"
+                            value={category}
+                            disabled={categoryOptions.length === 0}
+                            onChange={e => setCategory(e.target.value)}
+                        >
+                            <option value="">
+                                {categoryOptions.length === 0
+                                    ? 'Enter an amount first'
+                                    : 'Choose a category'}
+                            </option>
+                            {categoryOptions.map((option) => (
+                                <option key={option.id} value={option.id}>{option.label}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="field">
+                        <label htmlFor="comment">Comment</label>
+                        <input
+                            type="text"
+                            id="comment"
+                            value={comment}
+                            onChange={e => setComment(e.target.value)}
+                        />
+                    </div>
+
+                    {error && <div role="alert" className="alert">{error}</div>}
+                </div>
+
+                <div className="modal-foot">
+                    <button className="btn btn-quiet" onClick={toggle}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
+                        {loading ? 'Saving…' : 'Submit'}
+                    </button>
+                </div>
+            </div>
+        </div>
     )
 }

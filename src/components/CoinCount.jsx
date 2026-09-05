@@ -4,10 +4,16 @@ export const CoinCount = () => {
     const { totalCoins, loading, error } = useTransactions();
 
     return (
-        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', padding: '1rem' }}>
-            {error
-                ? <span className="text-danger">Couldn't load the balance.</span>
-                : <>Total Coins: {loading ? '...' : totalCoins}</>}
-        </div>
+        <section className="balance" aria-label="Total balance">
+            <p className="balance-label">Total balance</p>
+            {error ? (
+                <p className="balance-error">Couldn't load the balance.</p>
+            ) : (
+                <p className="balance-value">
+                    {loading ? '—' : totalCoins}
+                    <span className="balance-unit">coins</span>
+                </p>
+            )}
+        </section>
     );
 }

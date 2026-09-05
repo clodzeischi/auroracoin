@@ -155,6 +155,46 @@ describe('CoinForm', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/could not/i);
   });
 
+  it('renders nothing while closed', () => {
+    const backend = createFakeBackend();
+    render(
+      <CoinForm isOpen={false} toggle={() => {}} user={{ email: 'p@example.com' }} backend={backend} />
+    );
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('closes on Escape', async () => {
+    // Previously the component library's job; now ours.
+    const { toggle, user } = setup();
+
+    await user.keyboard('{Escape}');
+
+    expect(toggle).toHaveBeenCalled();
+  });
+
+  it('closes when the backdrop is clicked', async () => {
+    const { toggle, user } = setup();
+
+    await user.click(screen.getByRole('dialog').parentElement);
+
+    expect(toggle).toHaveBeenCalled();
+  });
+
+  it('stays open when the dialog itself is clicked', async () => {
+    const { toggle, user } = setup();
+
+    await user.click(screen.getByRole('dialog'));
+
+    expect(toggle).not.toHaveBeenCalled();
+  });
+
+  it('focuses the amount field on open, so typing just works', () => {
+    setup();
+
+    expect(amountField()).toHaveFocus();
+  });
+
   it('refuses to write when nobody is signed in', async () => {
     const { backend, user } = setup({ user: null });
 

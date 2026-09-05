@@ -10,12 +10,14 @@ export const App = () => {
     const { user, loading, login, logout } = useAuth();
 
     return (
-        <div  style={{maxWidth: '1000px', margin: '0 auto'}}>
+        <>
             <MockDataBanner />
-            <Header user={user} loading={loading} login={login} logout={logout}/>
-            <CoinCount/>
-            <CoinDashboard />
-            {user && <CoinTable />}
-        </div>
+            <div className="shell">
+                <Header user={user} loading={loading} login={login} logout={logout}/>
+                <CoinCount/>
+                <CoinDashboard />
+                {user && <CoinTable />}
+            </div>
+        </>
     )
 }

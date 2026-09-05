@@ -1,12 +1,16 @@
 export const TableRow = ( {data} ) => {
 
+    const tone = data.amount >= 0 ? 'earned' : 'spent';
+
     return (
         <tr>
-            <th scope="row">{data.amount}</th>
-            <td>{data.category}</td>
-            <td>{data.time}</td>
-            <td className="d-none d-md-table-cell">{data.user}</td>
-            <td>{data.comment}</td>
+            <td className={`amount is-${tone}`}>
+                {data.amount > 0 ? `+${data.amount}` : data.amount}
+            </td>
+            <td><span className={`chip is-${tone}`}>{data.category}</span></td>
+            <td className="cell-time">{data.time}</td>
+            <td className="cell-user hide-sm">{data.user}</td>
+            <td className="cell-comment">{data.comment}</td>
         </tr>
     )
 }
