@@ -1,9 +1,11 @@
 import {useState} from "react";
 import {CoinForm} from "./CoinForm.jsx";
+import {isChild} from "../data/roles.js";
 
 export const Header = ({user, loading, login, logout}) => {
 
     const [modalOpen, setModalOpen] = useState(false);
+    const child = isChild(user);
 
     return (
         <>
@@ -13,9 +15,12 @@ export const Header = ({user, loading, login, logout}) => {
                     <span>AuroraCoin</span>
                 </a>
                 <div className="header-actions">
-                    {/* While auth is resolving, render nothing rather than flashing
-                        a sign-in button at someone who is already signed in. */}
-                    {loading ? null : user ? (
+                    {/* A child gets no auth controls. Her session is anonymous:
+                        signing out would destroy the device pairing for good,
+                        and signing in would replace it. Neither is offered.
+                        While auth is still resolving, render nothing rather
+                        than flashing a sign-in button at someone signed in. */}
+                    {loading || child ? null : user ? (
                         <>
                             <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
                                 Add transaction
@@ -27,11 +32,13 @@ export const Header = ({user, loading, login, logout}) => {
                     )}
                 </div>
             </header>
-            <CoinForm
-                isOpen={modalOpen}
-                toggle={() => setModalOpen(!modalOpen)}
-                user={user}
-            />
+            {!child && (
+                <CoinForm
+                    isOpen={modalOpen}
+                    toggle={() => setModalOpen(!modalOpen)}
+                    user={user}
+                />
+            )}
         </>
     )
 }

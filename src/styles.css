@@ -107,15 +107,45 @@ body {
 
 /* ---------------- banner ---------------- */
 .banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
   background: var(--warn-bg);
   color: var(--warn);
-  text-align: center;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: .04em;
   padding: 6px 12px;
   border-bottom: 1px solid var(--line);
 }
+.banner-personas { display: inline-flex; gap: 4px; }
+.persona {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-radius: 999px;
+  padding: 1px 10px;
+  cursor: pointer;
+  opacity: .7;
+}
+.persona:hover { opacity: 1; }
+.persona.is-active {
+  background: var(--warn);
+  color: var(--warn-bg);
+  border-color: var(--warn);
+  opacity: 1;
+}
+
+/* Child ledger: the amount is text, not a control. */
+.amount-plain {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.amount-plain.is-earned { color: var(--earned); }
+.amount-plain.is-spent { color: var(--spent); }
 
 /* ---------------- header ---------------- */
 .header {

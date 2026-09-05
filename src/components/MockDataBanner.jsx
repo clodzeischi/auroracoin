@@ -1,14 +1,36 @@
-import { isUsingMockData } from '../data/index.js';
+import { isUsingMockData, getBackend } from '../data/index.js';
+import { roleFor } from '../data/roles.js';
 
 /**
- * Makes the dev flag impossible to miss. Renders nothing in a real build.
+ * Makes the dev flag impossible to miss, and lets both personas be previewed
+ * without a real Google account or a paired device. Renders nothing - and is
+ * stripped from the bundle entirely - in a real build.
  */
-export const MockDataBanner = () => {
+export const MockDataBanner = ({ user }) => {
     if (!isUsingMockData()) return null;
+
+    const role = roleFor(user);
+    const viewAs = (next) => getBackend().loginAs(next);
 
     return (
         <div role="status" className="banner">
-            Mock data — not connected to Firestore
+            <span>Mock data — not connected to Firestore</span>
+            <span className="banner-personas">
+                <button
+                    type="button"
+                    className={`persona${role === 'parent' ? ' is-active' : ''}`}
+                    onClick={() => viewAs('parent')}
+                >
+                    Parent
+                </button>
+                <button
+                    type="button"
+                    className={`persona${role === 'child' ? ' is-active' : ''}`}
+                    onClick={() => viewAs('child')}
+                >
+                    Child
+                </button>
+            </span>
         </div>
     );
 }

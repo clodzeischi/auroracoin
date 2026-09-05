@@ -1,7 +1,20 @@
-export const TableRow = ({ data, onEdit, onDelete }) => {
+export const TableRow = ({ data, onEdit, onDelete, readOnly = false }) => {
 
     const tone = data.amountMinor >= 0 ? 'earned' : 'spent';
     const display = data.display;
+
+    if (readOnly) {
+        // The child's ledger: what happened, not who changed it.
+        return (
+            <tr>
+                <td className={`cell-amount amount-plain is-${tone}`}>{display}</td>
+                <td><span className={`chip is-${tone}`}>{data.category}</span></td>
+                <td className="cell-time">{data.time}</td>
+                <td className="cell-comment">{data.comment}</td>
+            </tr>
+        );
+    }
+
     const describe = `${display} coins, ${data.category}`;
 
     return (

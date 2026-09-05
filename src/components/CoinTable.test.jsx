@@ -23,6 +23,15 @@ const setup = (transactions = [tx()]) => {
   return { backend, user: userEvent.setup() };
 };
 
+const setupAsChild = (transactions = [tx()]) => {
+  const backend = createFakeBackend();
+  render(<CoinTable backend={backend} user={{ isAnonymous: true }} />);
+  act(() => backend.emitTransactions(transactions));
+  return { backend, user: userEvent.setup() };
+};
+
+const headers = () => screen.getAllByRole('columnheader').map((h) => h.textContent.trim());
+
 describe('CoinTable', () => {
   it('turns each amount into a control, so a keyboard reaches every entry', () => {
     setup();
@@ -117,5 +126,50 @@ describe('CoinTable', () => {
     await user.click(screen.getByRole('button', { name: /delete transaction/i }));
 
     expect(screen.getByRole('alertdialog')).toHaveTextContent('Chores');
+  });
+
+  describe('as a child', () => {
+    it('shows only amount, category, date and comment', () => {
+      setupAsChild();
+      expect(headers()).toEqual(['Amount', 'Category', 'Date', 'Comment']);
+    });
+
+    it('does not show who added the entry', () => {
+      setupAsChild();
+      expect(screen.queryByText('parent@example.com')).not.toBeInTheDocument();
+    });
+
+    it('shows the amount as plain text, not an edit control', () => {
+      setupAsChild();
+      expect(screen.getByText('+10.00')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /edit transaction/i })).not.toBeInTheDocument();
+    });
+
+    it('offers no way to delete', () => {
+      setupAsChild();
+      expect(screen.queryByRole('button', { name: /delete transaction/i })).not.toBeInTheDocument();
+    });
+
+    it('hides the edit note even on an entry a parent edited', () => {
+      setupAsChild([
+        tx({ editedBy: 'parent2@example.com', editedAt: new Date('2026-09-03T09:00:00Z') }),
+      ]);
+      expect(screen.queryByText(/edited by/i)).not.toBeInTheDocument();
+    });
+
+    it('does not open an editor when a row is tapped', async () => {
+      const { user } = setupAsChild();
+
+      await user.click(screen.getByText('Chores'));
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('as a parent', () => {
+    it('still shows the full ledger including who added and the actions', () => {
+      setup();
+      expect(headers()).toEqual(['Amount', 'Category', 'Date', 'Added by', 'Comment', 'Actions']);
+    });
   });
 });

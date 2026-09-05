@@ -1,7 +1,14 @@
-const MOCK_USER = {
+const MOCK_PARENT = {
   uid: 'mock-parent-uid',
   email: 'parent@example.com',
   displayName: 'Mock Parent',
+};
+
+// A paired child device: anonymous, no email, nothing identifying.
+const MOCK_CHILD = {
+  uid: 'mock-child-uid',
+  isAnonymous: true,
+  displayName: 'Aurora',
 };
 
 let idCounter = 0;
@@ -58,10 +65,14 @@ export const createMockBackend = () => {
       return () => authListeners.delete(onUser);
     },
 
-    login() {
-      user = MOCK_USER;
+    loginAs(role) {
+      user = role === 'child' ? MOCK_CHILD : MOCK_PARENT;
       notifyAuth();
       return Promise.resolve();
+    },
+
+    login() {
+      return this.loginAs('parent');
     },
 
     logout() {

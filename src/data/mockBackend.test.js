@@ -201,6 +201,19 @@ describe('createMockBackend', () => {
     expect(onAuth.mock.lastCall[0]).toBeNull();
   });
 
+  it('can sign in as either persona, so both can be previewed in dev', async () => {
+    const backend = createMockBackend();
+    const onAuth = vi.fn();
+    backend.subscribeToAuth(onAuth);
+
+    await backend.loginAs('child');
+    expect(onAuth.mock.lastCall[0].isAnonymous).toBe(true);
+
+    await backend.loginAs('parent');
+    expect(onAuth.mock.lastCall[0].email).toEqual(expect.any(String));
+    expect(onAuth.mock.lastCall[0].isAnonymous).toBeUndefined();
+  });
+
   it('stops notifying auth subscribers after unsubscribe', async () => {
     const backend = createMockBackend();
     const onAuth = vi.fn();

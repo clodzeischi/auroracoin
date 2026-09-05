@@ -11,7 +11,7 @@ export const App = () => {
 
     return (
         <>
-            <MockDataBanner />
+            <MockDataBanner user={user} />
             <div className="shell">
                 <Header user={user} loading={loading} login={login} logout={logout}/>
                 <CoinCount/>

@@ -7,6 +7,7 @@ import {getBackend} from "../data/index.js";
 import {categoryLabel} from "../data/categories.js";
 import {formatEditedNote} from "../utils/format.js";
 import {formatMinorSigned} from "../utils/money.js";
+import {isChild} from "../data/roles.js";
 
 const formatTime = (timestamp) =>
     timestamp
@@ -15,6 +16,7 @@ const formatTime = (timestamp) =>
 
 export const CoinTable = ({ backend, user }) => {
 
+    const readOnly = isChild(user);
     const [resolvedBackend] = useState(() => backend ?? getBackend());
     const { transactions, loading, error } = useTransactions(resolvedBackend);
     const [editing, setEditing] = useState(null);
@@ -49,17 +51,18 @@ export const CoinTable = ({ backend, user }) => {
                                 <th>Amount</th>
                                 <th>Category</th>
                                 <th>Date</th>
-                                <th className="hide-sm">Added by</th>
+                                {!readOnly && <th className="hide-sm">Added by</th>}
                                 <th>Comment</th>
-                                <th><span className="sr-only">Actions</span></th>
+                                {!readOnly && <th><span className="sr-only">Actions</span></th>}
                             </tr>
                         </thead>
                         <tbody>
                             {transactions.map((transaction) => (
                                 <TableRow
                                     key={transaction.id}
-                                    onEdit={() => setEditing(transaction)}
-                                    onDelete={() => setConfirming(transaction)}
+                                    readOnly={readOnly}
+                                    onEdit={readOnly ? undefined : () => setEditing(transaction)}
+                                    onDelete={readOnly ? undefined : () => setConfirming(transaction)}
                                     data={{
                                         amountMinor: transaction.amountMinor,
                                         display: formatMinorSigned(transaction.amountMinor),
@@ -67,7 +70,7 @@ export const CoinTable = ({ backend, user }) => {
                                         time: formatTime(transaction.timestamp),
                                         user: transaction.user || '—',
                                         comment: transaction.comment || '—',
-                                        editedNote: formatEditedNote(transaction),
+                                        editedNote: readOnly ? null : formatEditedNote(transaction),
                                     }}
                                 />
                             ))}
@@ -77,16 +80,16 @@ export const CoinTable = ({ backend, user }) => {
             )}
 
             {/* Keyed by id so the form remounts with fresh state per entry. */}
-            <CoinForm
+            {!readOnly && <CoinForm
                 key={editing ? editing.id : 'none'}
                 isOpen={Boolean(editing)}
                 toggle={() => setEditing(null)}
                 user={user}
                 backend={resolvedBackend}
                 transaction={editing}
-            />
+            />}
 
-            <ConfirmDialog
+            {!readOnly && <ConfirmDialog
                 isOpen={Boolean(confirming)}
                 title="Delete this transaction?"
                 detail={confirming
@@ -95,7 +98,7 @@ export const CoinTable = ({ backend, user }) => {
                 confirmLabel="Delete"
                 onConfirm={confirmDelete}
                 onCancel={() => setConfirming(null)}
-            />
+            />}
         </div>
     )
 }
