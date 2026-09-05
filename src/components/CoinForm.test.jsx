@@ -19,7 +19,13 @@ const setup = (props = {}) => {
   return { backend, toggle, user: userEvent.setup() };
 };
 
+const amountField = () => screen.getByLabelText(/amount/i);
+const categoryField = () => screen.getByLabelText(/category/i);
 const submit = () => screen.getByRole('button', { name: /submit/i });
+const optionLabels = () =>
+  [...categoryField().querySelectorAll('option')]
+    .map((o) => o.textContent)
+    .filter((t) => t && !/choose/i.test(t));
 
 describe('CoinForm', () => {
   it('refuses an empty amount', async () => {
@@ -32,11 +38,11 @@ describe('CoinForm', () => {
   });
 
   it('refuses a fractional amount rather than silently truncating it', async () => {
-    // parseInt('5.7') === 5, which would have written a different number than
-    // the one typed - and the Firestore rule requires an integer anyway.
+    // parseInt('5.7') === 5, which would write a different number than typed -
+    // and the Firestore rule requires an integer anyway.
     const { backend, user } = setup();
 
-    await user.type(screen.getByLabelText(/amount/i), '5.7');
+    await user.type(amountField(), '5.7');
     await user.click(submit());
 
     expect(backend.addTransaction).not.toHaveBeenCalled();
@@ -46,33 +52,78 @@ describe('CoinForm', () => {
   it('refuses zero, which would be a no-op entry', async () => {
     const { backend, user } = setup();
 
-    await user.type(screen.getByLabelText(/amount/i), '0');
+    await user.type(amountField(), '0');
     await user.click(submit());
 
     expect(backend.addTransaction).not.toHaveBeenCalled();
   });
 
+  it('offers earning categories when coins are being added', async () => {
+    const { user } = setup();
+
+    await user.type(amountField(), '10');
+
+    expect(optionLabels()).toContain('Chores');
+    expect(optionLabels()).not.toContain('Toys');
+  });
+
+  it('offers spending categories when coins are being taken away', async () => {
+    const { user } = setup();
+
+    await user.type(amountField(), '-10');
+
+    expect(optionLabels()).toContain('Toys');
+    expect(optionLabels()).not.toContain('Chores');
+  });
+
+  it('clears a chosen category when the amount flips direction', async () => {
+    // Otherwise "Chores" could be submitted against a spend.
+    const { user } = setup();
+
+    await user.type(amountField(), '10');
+    await user.selectOptions(categoryField(), 'chores');
+    expect(categoryField()).toHaveValue('chores');
+
+    await user.clear(amountField());
+    await user.type(amountField(), '-10');
+
+    expect(categoryField()).toHaveValue('');
+  });
+
+  it('requires a category before it will write', async () => {
+    const { backend, user } = setup();
+
+    await user.type(amountField(), '10');
+    await user.click(submit());
+
+    expect(backend.addTransaction).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/category/i);
+  });
+
   it('accepts a negative amount, so coins can be spent', async () => {
     const { backend, user } = setup();
 
-    await user.type(screen.getByLabelText(/amount/i), '-4');
+    await user.type(amountField(), '-4');
+    await user.selectOptions(categoryField(), 'toys');
     await user.click(submit());
 
     expect(backend.addTransaction).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: -4 })
+      expect.objectContaining({ amount: -4, category: 'toys' })
     );
   });
 
-  it('writes the amount as a number, attributed to the signed-in user', async () => {
+  it('writes amount, category and comment, attributed to the signed-in user', async () => {
     const { backend, user } = setup();
 
-    await user.type(screen.getByLabelText(/amount/i), '12');
+    await user.type(amountField(), '12');
+    await user.selectOptions(categoryField(), 'gift');
     await user.type(screen.getByLabelText(/comment/i), 'birthday');
     await user.click(submit());
 
     expect(backend.addTransaction).toHaveBeenCalledWith({
       amount: 12,
       comment: 'birthday',
+      category: 'gift',
       user: 'parent@example.com',
     });
   });
@@ -80,7 +131,8 @@ describe('CoinForm', () => {
   it('closes after a successful submit', async () => {
     const { toggle, user } = setup();
 
-    await user.type(screen.getByLabelText(/amount/i), '3');
+    await user.type(amountField(), '3');
+    await user.selectOptions(categoryField(), 'chores');
     await user.click(submit());
 
     expect(toggle).toHaveBeenCalled();
@@ -95,7 +147,8 @@ describe('CoinForm', () => {
     );
     const user = userEvent.setup();
 
-    await user.type(screen.getByLabelText(/amount/i), '3');
+    await user.type(amountField(), '3');
+    await user.selectOptions(categoryField(), 'chores');
     await user.click(submit());
 
     expect(toggle).not.toHaveBeenCalled();
@@ -105,7 +158,8 @@ describe('CoinForm', () => {
   it('refuses to write when nobody is signed in', async () => {
     const { backend, user } = setup({ user: null });
 
-    await user.type(screen.getByLabelText(/amount/i), '5');
+    await user.type(amountField(), '5');
+    await user.selectOptions(categoryField(), 'chores');
     await user.click(submit());
 
     expect(backend.addTransaction).not.toHaveBeenCalled();

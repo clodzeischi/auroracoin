@@ -53,7 +53,8 @@ describe('createFirestoreBackend', () => {
       snapshotOf([
         firestoreDoc('abc123', {
           amount: 5,
-          comment: 'chores',
+          comment: 'tidied her room',
+          category: 'chores',
           user: 'parent@example.com',
           timestamp: { toDate: () => new Date('2026-01-01T00:00:00Z') },
         }),
@@ -64,11 +65,22 @@ describe('createFirestoreBackend', () => {
       {
         id: 'abc123',
         amount: 5,
-        comment: 'chores',
+        comment: 'tidied her room',
+        category: 'chores',
         user: 'parent@example.com',
         timestamp: new Date('2026-01-01T00:00:00Z'),
       },
     ]);
+  });
+
+  it('defaults a document written before categories existed to uncategorized', () => {
+    const onData = vi.fn();
+    createFirestoreBackend().subscribeToTransactions(onData, vi.fn());
+
+    const handleSnapshot = onSnapshot.mock.calls[0][1];
+    handleSnapshot(snapshotOf([firestoreDoc('legacy', { amount: 5, timestamp: null })]));
+
+    expect(onData.mock.lastCall[0][0].category).toBe('uncategorized');
   });
 
   it('tolerates a null timestamp on a not-yet-committed server write', () => {
@@ -92,6 +104,7 @@ describe('createFirestoreBackend', () => {
     await createFirestoreBackend().addTransaction({
       amount: 12,
       comment: 'birthday',
+      category: 'gift',
       user: 'parent@example.com',
     });
 
@@ -99,6 +112,7 @@ describe('createFirestoreBackend', () => {
     expect(addDoc).toHaveBeenCalledWith(expect.anything(), {
       amount: 12,
       comment: 'birthday',
+      category: 'gift',
       user: 'parent@example.com',
       timestamp: '__SERVER_TIMESTAMP__',
     });

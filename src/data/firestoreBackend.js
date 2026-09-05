@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { getDb, getAuthInstance, getProvider } from './firebaseApp.js';
+import { UNCATEGORIZED } from './categories.js';
 
 const COLLECTION = 'transactions';
 
@@ -17,6 +18,8 @@ const toTransaction = (doc) => {
     id: doc.id,
     amount: data.amount,
     comment: data.comment,
+    // Documents written before categories existed have no field at all.
+    category: data.category ?? UNCATEGORIZED,
     user: data.user,
     // Null until the server resolves serverTimestamp() on a pending write.
     timestamp: data.timestamp ? data.timestamp.toDate() : null,
@@ -48,10 +51,11 @@ export const createFirestoreBackend = () => ({
     );
   },
 
-  addTransaction({ amount, comment, user }) {
+  addTransaction({ amount, comment, category, user }) {
     return addDoc(collection(getDb(), COLLECTION), {
       amount,
       comment,
+      category,
       user,
       timestamp: serverTimestamp(),
     });

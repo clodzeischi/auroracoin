@@ -37,6 +37,41 @@ describe('createMockBackend', () => {
     expect(times).toEqual([...times].sort((a, b) => b - a));
   });
 
+  it('seeds every transaction with a valid category so the dashboard has shape', () => {
+    const backend = createMockBackend();
+    const onData = vi.fn();
+    backend.subscribeToTransactions(onData);
+
+    const categories = onData.mock.lastCall[0].map((t) => t.category);
+    expect(categories.every(Boolean)).toBe(true);
+    expect(new Set(categories).size).toBeGreaterThan(1);
+  });
+
+  it('seeds both earning and spending so both breakdowns render', () => {
+    const backend = createMockBackend();
+    const onData = vi.fn();
+    backend.subscribeToTransactions(onData);
+
+    const amounts = onData.mock.lastCall[0].map((t) => t.amount);
+    expect(amounts.some((a) => a > 0)).toBe(true);
+    expect(amounts.some((a) => a < 0)).toBe(true);
+  });
+
+  it('stores the category on an added transaction', async () => {
+    const backend = createMockBackend();
+    const onData = vi.fn();
+    backend.subscribeToTransactions(onData);
+
+    await backend.addTransaction({
+      amount: -6,
+      comment: 'lego',
+      category: 'toys',
+      user: 'parent@example.com',
+    });
+
+    expect(onData.mock.lastCall[0][0].category).toBe('toys');
+  });
+
   it('appends a transaction and pushes it to every subscriber', async () => {
     const backend = createMockBackend();
     const first = vi.fn();

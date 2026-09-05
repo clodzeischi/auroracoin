@@ -1,6 +1,7 @@
 import {Table} from "reactstrap";
 import {TableRow} from "./TableRow.jsx";
 import {useTransactions} from "../hooks/useTransactions.js";
+import {categoryLabel} from "../data/categories.js";
 
 const formatTime = (timestamp) => timestamp ? timestamp.toLocaleString() : 'N/A';
 
@@ -20,6 +21,7 @@ export const CoinTable = () => {
             <thead>
                 <tr>
                     <th>Amount</th>
+                    <th>Category</th>
                     <th>Time</th>
                     <th className="d-none d-md-table-cell">User</th>
                     <th>Comment</th>
@@ -31,6 +33,7 @@ export const CoinTable = () => {
                         key={transaction.id}
                         data={{
                             amount: transaction.amount,
+                            category: categoryLabel(transaction.category),
                             time: formatTime(transaction.timestamp),
                             user: transaction.user || 'N/A',
                             comment: transaction.comment || 'N/A',

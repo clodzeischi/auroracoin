@@ -38,7 +38,8 @@ export const createFakeBackend = () => {
 export const tx = (overrides = {}) => ({
   id: 'tx-1',
   amount: 5,
-  comment: 'chores',
+  comment: 'tidied her room',
+  category: 'chores',
   user: 'parent@example.com',
   timestamp: new Date('2026-01-01T00:00:00Z'),
   ...overrides,

@@ -13,6 +13,7 @@ const seedTransactions = () => [
     id: 'seed-1',
     amount: 10,
     comment: 'Tidied her room all week',
+    category: 'chores',
     user: 'parent@example.com',
     timestamp: new Date('2026-01-05T09:00:00Z'),
   },
@@ -20,6 +21,7 @@ const seedTransactions = () => [
     id: 'seed-2',
     amount: -4,
     comment: 'Spent on stickers',
+    category: 'treats',
     user: 'parent@example.com',
     timestamp: new Date('2026-01-11T17:30:00Z'),
   },
@@ -27,6 +29,7 @@ const seedTransactions = () => [
     id: 'seed-3',
     amount: 25,
     comment: 'Birthday from Grandma',
+    category: 'gift',
     user: 'otherparent@example.com',
     timestamp: new Date('2026-02-02T12:00:00Z'),
   },
@@ -73,10 +76,10 @@ export const createMockBackend = () => {
       return () => dataListeners.delete(onData);
     },
 
-    addTransaction({ amount, comment, user: author }) {
+    addTransaction({ amount, comment, category, user: author }) {
       transactions = [
         ...transactions,
-        { id: nextId(), amount, comment, user: author, timestamp: new Date() },
+        { id: nextId(), amount, comment, category, user: author, timestamp: new Date() },
       ];
       notifyData();
       return Promise.resolve();

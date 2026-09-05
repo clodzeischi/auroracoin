@@ -1,6 +1,7 @@
 import {Button, FormGroup, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader} from "reactstrap";
 import {useState} from "react";
 import {getBackend} from "../data/index.js";
+import {categoriesForAmount} from "../data/categories.js";
 
 /**
  * Coins are whole units. Returns null for anything we refuse to write, so the
@@ -17,14 +18,31 @@ const parseAmount = (raw) => {
 export const CoinForm = ({ isOpen, toggle, user, backend = getBackend() }) => {
 
     const [amount, setAmount] = useState('');
+    const [category, setCategory] = useState('');
     const [comment, setComment] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    const parsedAmount = parseAmount(amount);
+    const categoryOptions = categoriesForAmount(parsedAmount);
+
+    const handleAmountChange = (nextAmount) => {
+        setAmount(nextAmount);
+        // Earning and spending have disjoint category sets, so a category
+        // chosen before the sign flipped is no longer a legal choice.
+        const nextOptions = categoriesForAmount(parseAmount(nextAmount));
+        if (!nextOptions.some((option) => option.id === category)) {
+            setCategory('');
+        }
+    };
+
     const handleSubmit = async () => {
-        const parsedAmount = parseAmount(amount);
         if (parsedAmount === null) {
             setError('Enter a non-zero whole number of coins.');
+            return;
+        }
+        if (!category) {
+            setError('Choose a category.');
             return;
         }
         if (!user) {
@@ -38,9 +56,11 @@ export const CoinForm = ({ isOpen, toggle, user, backend = getBackend() }) => {
             await backend.addTransaction({
                 amount: parsedAmount,
                 comment,
+                category,
                 user: user.email,
             });
             setAmount('');
+            setCategory('');
             setComment('');
             toggle();
         }
@@ -59,7 +79,22 @@ export const CoinForm = ({ isOpen, toggle, user, backend = getBackend() }) => {
                 <FormGroup>
                     <Label for="amount">Amount</Label>
                     <Input type="number" id="amount" value={amount}
-                           onChange={e => setAmount(e.target.value)} />
+                           onChange={e => handleAmountChange(e.target.value)} />
+                </FormGroup>
+                <FormGroup>
+                    <Label for="category">Category</Label>
+                    <Input type="select" id="category" value={category}
+                           disabled={categoryOptions.length === 0}
+                           onChange={e => setCategory(e.target.value)}>
+                        <option value="">
+                            {categoryOptions.length === 0
+                                ? 'Enter an amount first'
+                                : 'Choose a category'}
+                        </option>
+                        {categoryOptions.map((option) => (
+                            <option key={option.id} value={option.id}>{option.label}</option>
+                        ))}
+                    </Input>
                 </FormGroup>
                 <FormGroup>
                     <Label for="comment">Comment</Label>
