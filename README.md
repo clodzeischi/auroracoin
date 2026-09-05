@@ -25,6 +25,20 @@ firebase apps:sdkconfig web <APP_ID>
 and set `VITE_USE_MOCK_DATA=false`. A production build always uses real
 Firestore regardless of the flag.
 
+### Two sign-in providers have to be enabled
+
+In the Firebase console, under **Authentication → Sign-in method**, enable both:
+
+- **Google** — how a parent signs in.
+- **Anonymous** — how a child's device signs in. Without it `signInAnonymously`
+  returns `auth/admin-restricted-operation` and pairing a child's device cannot
+  start at all.
+
+Anonymous sessions are not a hole in the model: an anonymous user that has not
+redeemed a pairing code can read nothing, which `rules-tests/` asserts
+directly. A device may only ever see the one child its `devices/{uid}` record
+names, and only while that child exists.
+
 ## How it works
 
 Parents sign in with Google and can invite a second parent by email. A child's
