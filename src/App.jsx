@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Header } from "./components/Header.jsx";
 import { Intro } from "./components/Intro.jsx";
 import { Onboarding } from "./components/Onboarding.jsx";
@@ -32,19 +32,63 @@ export const App = () => {
     const pairings = usePairings(backend, family?.id ?? null);
 
     const [selectedChildId, setSelectedChildId] = useState(null);
-    const [addingChild, setAddingChild] = useState(false);
+    const [addingChildren, setAddingChildren] = useState(false);
     const [joining, setJoining] = useState(false);
     const [declinedInvite, setDeclinedInvite] = useState(false);
 
-    // Selecting a child pushes history, so the phone's back gesture returns to
-    // the family view instead of leaving the app.
+    /**
+     * Both screens reachable from the family view push a history entry, so the
+     * phone's back gesture returns there rather than leaving the app - and so
+     * the gesture and the on-screen button agree, since both leave by
+     * unwinding that entry.
+     */
     const openChild = useCallback((childId) => {
         setSelectedChildId(childId);
         window.history.pushState({ childId }, '');
     }, []);
 
+    // A ref rather than the state flag, because this has to settle
+    // synchronously: StrictMode runs the effect below twice, and two entries
+    // pushed for one screen would take two back gestures to undo.
+    const addChildrenEntry = useRef(false);
+
+    const openAddChildren = useCallback(() => {
+        if (addChildrenEntry.current) return;
+        addChildrenEntry.current = true;
+        setAddingChildren(true);
+        window.history.pushState({ addingChildren: true }, '');
+    }, []);
+
+    // The step belongs to one household: if the family changes under the
+    // session, it does not carry over. Declared before the effect that opens
+    // it so a new family still lands on the step when it needs to.
     useEffect(() => {
-        const onPopState = () => setSelectedChildId(null);
+        addChildrenEntry.current = false;
+        setAddingChildren(false);
+    }, [family?.id]);
+
+    /**
+     * A family with no children has nowhere else to be, so the add-children
+     * step opens itself. Leaving is deliberate - the Done button - rather than
+     * automatic on the first child arriving, which used to throw a parent out
+     * of "Add your children" after exactly one, before Done had ever rendered.
+     */
+    useEffect(() => {
+        if (!familyLoading && family && children.length === 0 && !addingChildren) {
+            openAddChildren();
+        }
+    }, [familyLoading, family, children.length, addingChildren, openAddChildren]);
+
+    useEffect(() => {
+        // Going back closes whichever of the two is open. If that leaves a
+        // family with no children the effect above reopens the step - it
+        // depends on `addingChildren`, so closing it is itself what re-runs
+        // it - and a parent cannot strand themselves on an empty household.
+        const onPopState = () => {
+            setSelectedChildId(null);
+            addChildrenEntry.current = false;
+            setAddingChildren(false);
+        };
         window.addEventListener('popstate', onPopState);
         return () => window.removeEventListener('popstate', onPopState);
     }, []);
@@ -100,11 +144,15 @@ export const App = () => {
         );
     }
 
-    // No family, no children, or explicitly adding one: onboarding.
-    if (!family || children.length === 0 || addingChild) {
+    // No family yet, or the add-children step is open. The children.length
+    // term is not what keeps the step open - `addingChildren` does that, which
+    // is why adding a child no longer ejects you mid-flow - it just avoids
+    // showing an empty dashboard for the frame before the effect reopens it.
+    if (!family || addingChildren || children.length === 0) {
         return shell(
             <Onboarding
                 family={family}
+                childCount={children.length}
                 onCreateFamily={(name) =>
                     backend.createFamily({
                         uid: user.uid,
@@ -114,8 +162,7 @@ export const App = () => {
                     })
                 }
                 onAddChild={(name) => backend.addChild(family.id, { name })}
-                onDone={() => setAddingChild(false)}
-                onCancel={addingChild ? () => setAddingChild(false) : undefined}
+                onLeave={() => window.history.back()}
             />
         );
     }
@@ -139,7 +186,7 @@ export const App = () => {
             children={children}
             ledgerFor={(childId) => backend.ledgerFor(family.id, childId)}
             onOpenChild={openChild}
-            onAddChild={() => setAddingChild(true)}
+            onAddChild={openAddChildren}
             onRenameChild={(childId, name) => backend.renameChild(family.id, childId, name)}
             onDeleteChild={(childId) => backend.deleteChild(family.id, childId)}
             pendingInvites={pendingInvites}

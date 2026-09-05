@@ -7,7 +7,7 @@ const PrivacyNotice = ({ children }) => (
     </div>
 );
 
-export const Onboarding = ({ family, onCreateFamily, onAddChild, onDone, onCancel }) => {
+export const Onboarding = ({ family, childCount = 0, onCreateFamily, onAddChild, onLeave }) => {
     const [name, setName] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
@@ -94,13 +94,17 @@ export const Onboarding = ({ family, onCreateFamily, onAddChild, onDone, onCance
                 <button className="btn btn-primary" onClick={submit} disabled={busy}>
                     {busy ? 'Saving…' : step === 'family' ? 'Continue' : 'Add child'}
                 </button>
-                {step === 'children' && added.length > 0 && (
-                    <button className="btn btn-quiet" onClick={onDone}>Done</button>
-                )}
-                {/* Only offered when there is somewhere to go back to: during
-                    first-run there is no family view behind this yet. */}
-                {onCancel && added.length === 0 && (
-                    <button className="btn btn-quiet" onClick={onCancel}>Back</button>
+                {/* One way out, offered as soon as there is a family view to
+                    go out to. It reads as Done when this visit added somebody
+                    and Back when it did not, but both simply leave the step.
+                    During first-run there is nothing behind it yet, so no exit
+                    appears until a child exists - counting what this visit
+                    added as well as what was already there, so the button does
+                    not wait on the subscription to come back round. */}
+                {step === 'children' && (childCount > 0 || added.length > 0) && (
+                    <button className="btn btn-quiet" onClick={onLeave}>
+                        {added.length > 0 ? 'Done' : 'Back'}
+                    </button>
                 )}
             </div>
         </main>

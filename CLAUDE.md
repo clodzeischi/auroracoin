@@ -102,6 +102,26 @@ tear down and re-establish one Firestore listener per child - re-reading, and
 re-paying for, the whole collection every time a dialog opened. Regression tests
 live in both backend test files.
 
+## Screen transitions
+
+There is no router. `App` picks a screen from state, and two rules keep that
+honest:
+
+- **A step is held open by intent, not by the condition that opened it.** The
+  add-children step is held by `addingChildren`, not by `children.length === 0`
+  — that was the bug: the first child arriving made the condition false and
+  ejected the parent mid-flow, before Done had ever rendered. The count only
+  suppresses a one-frame flash of an empty dashboard.
+- **Anything reachable from the family view pushes a history entry, and leaves
+  by unwinding it.** That covers the child ledger and the add-children step.
+  The on-screen button calls `window.history.back()` too, so the button and the
+  phone's back gesture cannot disagree. Screens that are *not* reachable from
+  the family view (intro, naming a family, accepting an invite) push nothing.
+
+Closing the step is what re-runs the effect that opens it, so a family with no
+children cannot be escaped into an empty dashboard. `src/App.test.jsx` drives
+these through the real mock backend.
+
 ## Shared pieces, and when to reach for them
 
 Four things exist because a third copy showed up. Use them rather than writing

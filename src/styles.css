@@ -680,7 +680,9 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 .child-line .is-earned { color: var(--earned); }
 .child-line .is-spent { color: var(--spent); }
 
-.family-actions { margin-top: 20px; }
+/* Same bottom margin as .card, so the row sits in the page's rhythm instead
+   of butting up against the card that follows it. */
+.family-actions { margin: 20px 0; }
 
 /* ---------------- child page ---------------- */
 .ledger-head {
