@@ -4,6 +4,9 @@ import {
   orderBy,
   onSnapshot,
   addDoc,
+  doc,
+  updateDoc,
+  deleteDoc,
   serverTimestamp,
 } from 'firebase/firestore';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
@@ -23,6 +26,8 @@ const toTransaction = (doc) => {
     user: data.user,
     // Null until the server resolves serverTimestamp() on a pending write.
     timestamp: data.timestamp ? data.timestamp.toDate() : null,
+    editedBy: data.editedBy ?? null,
+    editedAt: data.editedAt ? data.editedAt.toDate() : null,
   };
 };
 
@@ -49,6 +54,22 @@ export const createFirestoreBackend = () => ({
       (snapshot) => onData(snapshot.docs.map(toTransaction)),
       onError
     );
+  },
+
+  updateTransaction(id, { amount, comment, category, editedBy }) {
+    // user and timestamp are deliberately not sent: the rules pin them to
+    // their existing values, so an edit cannot rewrite authorship or date.
+    return updateDoc(doc(getDb(), COLLECTION, id), {
+      amount,
+      comment,
+      category,
+      editedBy,
+      editedAt: serverTimestamp(),
+    });
+  },
+
+  deleteTransaction(id) {
+    return deleteDoc(doc(getDb(), COLLECTION, id));
   },
 
   addTransaction({ amount, comment, category, user }) {

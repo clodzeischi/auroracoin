@@ -28,6 +28,8 @@ export const createFakeBackend = () => {
     login: vi.fn(() => Promise.resolve()),
     logout: vi.fn(() => Promise.resolve()),
     addTransaction: vi.fn(() => Promise.resolve()),
+    updateTransaction: vi.fn(() => Promise.resolve()),
+    deleteTransaction: vi.fn(() => Promise.resolve()),
 
     emitAuth: (user) => authListener(user),
     emitTransactions: (transactions) => dataListener(transactions),

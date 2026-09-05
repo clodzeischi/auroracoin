@@ -113,6 +113,74 @@ describe('createMockBackend', () => {
     expect(onData).toHaveBeenCalledTimes(callsBefore);
   });
 
+  it('updates a transaction in place and notifies subscribers', async () => {
+    const backend = createMockBackend();
+    const onData = vi.fn();
+    backend.subscribeToTransactions(onData);
+    const original = onData.mock.lastCall[0][0];
+
+    await backend.updateTransaction(original.id, {
+      amount: 99,
+      comment: 'corrected',
+      category: 'bonus',
+      editedBy: 'parent2@example.com',
+    });
+
+    const updated = onData.mock.lastCall[0].find((t) => t.id === original.id);
+    expect(updated).toMatchObject({ amount: 99, comment: 'corrected', category: 'bonus' });
+  });
+
+  it('records who edited a transaction and when', async () => {
+    const backend = createMockBackend();
+    const onData = vi.fn();
+    backend.subscribeToTransactions(onData);
+    const original = onData.mock.lastCall[0][0];
+
+    await backend.updateTransaction(original.id, {
+      amount: 12,
+      comment: '',
+      category: 'bonus',
+      editedBy: 'parent2@example.com',
+    });
+
+    const updated = onData.mock.lastCall[0].find((t) => t.id === original.id);
+    expect(updated.editedBy).toBe('parent2@example.com');
+    expect(updated.editedAt).toBeInstanceOf(Date);
+  });
+
+  it('leaves the original author and date untouched by an edit', async () => {
+    // An edit changes what was recorded, never who recorded it or when.
+    const backend = createMockBackend();
+    const onData = vi.fn();
+    backend.subscribeToTransactions(onData);
+    const original = onData.mock.lastCall[0][0];
+
+    await backend.updateTransaction(original.id, {
+      amount: 1,
+      comment: '',
+      category: 'bonus',
+      editedBy: 'parent2@example.com',
+    });
+
+    const updated = onData.mock.lastCall[0].find((t) => t.id === original.id);
+    expect(updated.user).toBe(original.user);
+    expect(updated.timestamp).toEqual(original.timestamp);
+  });
+
+  it('deletes a transaction and notifies subscribers', async () => {
+    const backend = createMockBackend();
+    const onData = vi.fn();
+    backend.subscribeToTransactions(onData);
+    const before = onData.mock.lastCall[0];
+    const victim = before[0];
+
+    await backend.deleteTransaction(victim.id);
+
+    const after = onData.mock.lastCall[0];
+    expect(after).toHaveLength(before.length - 1);
+    expect(after.some((t) => t.id === victim.id)).toBe(false);
+  });
+
   it('starts signed out', () => {
     const backend = createMockBackend();
     const onAuth = vi.fn();

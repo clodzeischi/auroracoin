@@ -14,11 +14,12 @@ const parseAmount = (raw) => {
     return value;
 };
 
-export const CoinForm = ({ isOpen, toggle, user, backend = getBackend() }) => {
+export const CoinForm = ({ isOpen, toggle, user, backend = getBackend(), transaction = null }) => {
 
-    const [amount, setAmount] = useState('');
-    const [category, setCategory] = useState('');
-    const [comment, setComment] = useState('');
+    const isEditing = Boolean(transaction);
+    const [amount, setAmount] = useState(isEditing ? String(transaction.amount) : '');
+    const [category, setCategory] = useState(transaction?.category ?? '');
+    const [comment, setComment] = useState(transaction?.comment ?? '');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const amountRef = useRef(null);
@@ -43,9 +44,12 @@ export const CoinForm = ({ isOpen, toggle, user, backend = getBackend() }) => {
     const handleAmountChange = (nextAmount) => {
         setAmount(nextAmount);
         // Earning and spending have disjoint category sets, so a category
-        // chosen before the sign flipped is no longer a legal choice.
+        // chosen before the sign flipped is no longer a legal choice. Only
+        // act once the new amount is usable: while the field is empty or
+        // half-typed there are no options at all, and clearing then would
+        // wipe the category every time someone retypes an amount.
         const nextOptions = categoriesForAmount(parseAmount(nextAmount));
-        if (!nextOptions.some((option) => option.id === category)) {
+        if (nextOptions.length > 0 && !nextOptions.some((option) => option.id === category)) {
             setCategory('');
         }
     };
@@ -67,15 +71,26 @@ export const CoinForm = ({ isOpen, toggle, user, backend = getBackend() }) => {
         setLoading(true);
         setError(null);
         try {
-            await backend.addTransaction({
-                amount: parsedAmount,
-                comment,
-                category,
-                user: user.email,
-            });
-            setAmount('');
-            setCategory('');
-            setComment('');
+            if (isEditing) {
+                // Authorship and date are not sent: the rules pin them, so an
+                // edit records who changed it without rewriting who made it.
+                await backend.updateTransaction(transaction.id, {
+                    amount: parsedAmount,
+                    comment,
+                    category,
+                    editedBy: user.email,
+                });
+            } else {
+                await backend.addTransaction({
+                    amount: parsedAmount,
+                    comment,
+                    category,
+                    user: user.email,
+                });
+                setAmount('');
+                setCategory('');
+                setComment('');
+            }
             toggle();
         }
         catch {
@@ -96,7 +111,9 @@ export const CoinForm = ({ isOpen, toggle, user, backend = getBackend() }) => {
                 onMouseDown={(e) => e.stopPropagation()}
             >
                 <div className="modal-head">
-                    <h2 className="modal-title" id="coin-form-title">Add transaction</h2>
+                    <h2 className="modal-title" id="coin-form-title">
+                        {isEditing ? 'Edit transaction' : 'Add transaction'}
+                    </h2>
                     <button className="modal-close" onClick={toggle} aria-label="Close">×</button>
                 </div>
 
@@ -150,7 +167,7 @@ export const CoinForm = ({ isOpen, toggle, user, backend = getBackend() }) => {
                 <div className="modal-foot">
                     <button className="btn btn-quiet" onClick={toggle}>Cancel</button>
                     <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
-                        {loading ? 'Saving…' : 'Submit'}
+                        {loading ? 'Saving…' : isEditing ? 'Save' : 'Submit'}
                     </button>
                 </div>
             </div>

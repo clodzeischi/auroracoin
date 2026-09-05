@@ -163,6 +163,9 @@ body {
 .btn-quiet { background: transparent; color: var(--ink-2); border-color: var(--line-2); }
 .btn-quiet:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
 
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 86%, black); }
+
 /* ---------------- balance hero ---------------- */
 .balance {
   position: relative;
@@ -335,14 +338,63 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 .ledger td { padding: 11px 14px 11px 0; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .ledger tbody tr:last-child td { border-bottom: 0; }
 .ledger tbody tr:hover { background: var(--surface-2); }
-.ledger .amount {
+.ledger .cell-amount { width: 1%; white-space: nowrap; }
+
+/* The amount is the edit control: it looks like text, behaves like a button. */
+.amount-btn {
+  font: inherit;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  width: 1%;
+  background: none;
+  border: 0;
+  padding: 2px 2px;
+  margin: -2px -2px;
+  cursor: pointer;
+  border-radius: 5px;
+  text-decoration-color: transparent;
+  transition: text-decoration-color .15s ease;
 }
-.amount.is-earned { color: var(--earned); }
-.amount.is-spent { color: var(--spent); }
+.amount-btn:hover { text-decoration: underline; text-decoration-color: currentColor; }
+.amount-btn.is-earned { color: var(--earned); }
+.amount-btn.is-spent { color: var(--spent); }
+
+.ledger-row { cursor: pointer; }
+
+.cell-actions { width: 1%; text-align: right; padding-right: 0 !important; }
+.row-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Comfortable on a phone, unobtrusive on a desktop. */
+  width: 32px;
+  height: 32px;
+  font-size: 19px;
+  line-height: 1;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  color: var(--ink-3);
+  cursor: pointer;
+  opacity: .55;
+  transition: opacity .15s ease, background-color .15s ease, color .15s ease;
+}
+.ledger-row:hover .row-delete { opacity: 1; }
+.row-delete:hover { background: var(--danger-bg); color: var(--danger); opacity: 1; }
+.row-delete:focus-visible { opacity: 1; }
+
+.edited-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+@media (hover: none) {
+  /* No hover on touch, so the control is always visible and bigger. */
+  .row-delete { opacity: .8; width: 38px; height: 38px; }
+}
 .cell-time, .cell-user { color: var(--ink-3); font-size: 13px; white-space: nowrap; }
 .cell-comment { color: var(--ink-2); }
 
@@ -389,6 +441,15 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 }
 @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
 @keyframes rise { from { opacity: 0; transform: translateY(10px) scale(.99) } to { opacity: 1; transform: none } }
+
+.modal-sm { max-width: 340px; }
+.confirm-detail {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
 
 .modal-head {
   display: flex;

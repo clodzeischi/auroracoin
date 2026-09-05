@@ -1,15 +1,29 @@
+import {useState} from "react";
 import {TableRow} from "./TableRow.jsx";
+import {CoinForm} from "./CoinForm.jsx";
+import {ConfirmDialog} from "./ConfirmDialog.jsx";
 import {useTransactions} from "../hooks/useTransactions.js";
+import {getBackend} from "../data/index.js";
 import {categoryLabel} from "../data/categories.js";
+import {formatEditedNote} from "../utils/format.js";
 
 const formatTime = (timestamp) =>
     timestamp
         ? timestamp.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
         : '—';
 
-export const CoinTable = () => {
+export const CoinTable = ({ backend, user }) => {
 
-    const { transactions, loading, error } = useTransactions();
+    const [resolvedBackend] = useState(() => backend ?? getBackend());
+    const { transactions, loading, error } = useTransactions(resolvedBackend);
+    const [editing, setEditing] = useState(null);
+    const [confirming, setConfirming] = useState(null);
+
+    const confirmDelete = async () => {
+        const target = confirming;
+        setConfirming(null);
+        await resolvedBackend.deleteTransaction(target.id);
+    };
 
     return (
         <div className="card">
@@ -36,18 +50,22 @@ export const CoinTable = () => {
                                 <th>Date</th>
                                 <th className="hide-sm">Added by</th>
                                 <th>Comment</th>
+                                <th><span className="sr-only">Actions</span></th>
                             </tr>
                         </thead>
                         <tbody>
                             {transactions.map((transaction) => (
                                 <TableRow
                                     key={transaction.id}
+                                    onEdit={() => setEditing(transaction)}
+                                    onDelete={() => setConfirming(transaction)}
                                     data={{
                                         amount: transaction.amount,
                                         category: categoryLabel(transaction.category),
                                         time: formatTime(transaction.timestamp),
                                         user: transaction.user || '—',
                                         comment: transaction.comment || '—',
+                                        editedNote: formatEditedNote(transaction),
                                     }}
                                 />
                             ))}
@@ -55,6 +73,27 @@ export const CoinTable = () => {
                     </table>
                 </div>
             )}
+
+            {/* Keyed by id so the form remounts with fresh state per entry. */}
+            <CoinForm
+                key={editing ? editing.id : 'none'}
+                isOpen={Boolean(editing)}
+                toggle={() => setEditing(null)}
+                user={user}
+                backend={resolvedBackend}
+                transaction={editing}
+            />
+
+            <ConfirmDialog
+                isOpen={Boolean(confirming)}
+                title="Delete this transaction?"
+                detail={confirming
+                    ? `${confirming.amount > 0 ? '+' : ''}${confirming.amount} coins · ${categoryLabel(confirming.category)}`
+                    : ''}
+                confirmLabel="Delete"
+                onConfirm={confirmDelete}
+                onCancel={() => setConfirming(null)}
+            />
         </div>
     )
 }

@@ -16,7 +16,7 @@ export const App = () => {
                 <Header user={user} loading={loading} login={login} logout={logout}/>
                 <CoinCount/>
                 <CoinDashboard />
-                {user && <CoinTable />}
+                {user && <CoinTable user={user} />}
             </div>
         </>
     )

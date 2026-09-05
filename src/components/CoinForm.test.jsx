@@ -90,6 +90,19 @@ describe('CoinForm', () => {
     expect(categoryField()).toHaveValue('');
   });
 
+  it('keeps the category while the amount is being retyped', async () => {
+    // Clearing the field makes the amount momentarily invalid; the category
+    // must survive that, or editing an amount silently drops it.
+    const { user } = setup();
+
+    await user.type(amountField(), '10');
+    await user.selectOptions(categoryField(), 'chores');
+    await user.clear(amountField());
+    await user.type(amountField(), '15');
+
+    expect(categoryField()).toHaveValue('chores');
+  });
+
   it('requires a category before it will write', async () => {
     const { backend, user } = setup();
 

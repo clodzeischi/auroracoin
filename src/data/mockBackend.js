@@ -76,6 +76,23 @@ export const createMockBackend = () => {
       return () => dataListeners.delete(onData);
     },
 
+    updateTransaction(id, { amount, comment, category, editedBy }) {
+      transactions = transactions.map((transaction) =>
+        transaction.id === id
+          // Spread first so author and timestamp survive the edit.
+          ? { ...transaction, amount, comment, category, editedBy, editedAt: new Date() }
+          : transaction
+      );
+      notifyData();
+      return Promise.resolve();
+    },
+
+    deleteTransaction(id) {
+      transactions = transactions.filter((transaction) => transaction.id !== id);
+      notifyData();
+      return Promise.resolve();
+    },
+
     addTransaction({ amount, comment, category, user: author }) {
       transactions = [
         ...transactions,
