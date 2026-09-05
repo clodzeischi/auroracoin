@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getBackend } from '../data/index.js';
 
-// A single malformed document must not turn the whole balance into NaN.
+// Summed in integer hundredths, so the total is exact. A single malformed
+// document must not turn the whole balance into NaN.
 const sumAmounts = (transactions) =>
   transactions.reduce(
     (total, transaction) =>
-      Number.isFinite(transaction.amount) ? total + transaction.amount : total,
+      Number.isFinite(transaction.amountMinor) ? total + transaction.amountMinor : total,
     0
   );
 
@@ -29,7 +30,7 @@ export const useTransactions = (backend = getBackend()) => {
     return () => unsubscribe();
   }, [backend]);
 
-  const totalCoins = useMemo(() => sumAmounts(transactions), [transactions]);
+  const totalMinor = useMemo(() => sumAmounts(transactions), [transactions]);
 
-  return { transactions, totalCoins, loading, error };
+  return { transactions, totalMinor, loading, error };
 };

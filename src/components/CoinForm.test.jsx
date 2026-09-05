@@ -34,19 +34,31 @@ describe('CoinForm', () => {
     await user.click(submit());
 
     expect(backend.addTransaction).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent(/whole number/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/two decimal places/i);
   });
 
-  it('refuses a fractional amount rather than silently truncating it', async () => {
-    // parseInt('5.7') === 5, which would write a different number than typed -
-    // and the Firestore rule requires an integer anyway.
+  it('accepts two decimal places and stores them as hundredths', async () => {
     const { backend, user } = setup();
 
-    await user.type(amountField(), '5.7');
+    await user.type(amountField(), '10.07');
+    await user.selectOptions(categoryField(), 'chores');
+    await user.click(submit());
+
+    expect(backend.addTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ amountMinor: 1007 })
+    );
+  });
+
+  it('refuses a third decimal place rather than rounding it away', async () => {
+    // Silently turning 5.755 into 5.76 would write a different number than
+    // the one typed.
+    const { backend, user } = setup();
+
+    await user.type(amountField(), '5.755');
     await user.click(submit());
 
     expect(backend.addTransaction).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent(/whole number/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/two decimal places/i);
   });
 
   it('refuses zero, which would be a no-op entry', async () => {
@@ -116,25 +128,25 @@ describe('CoinForm', () => {
   it('accepts a negative amount, so coins can be spent', async () => {
     const { backend, user } = setup();
 
-    await user.type(amountField(), '-4');
+    await user.type(amountField(), '-4.25');
     await user.selectOptions(categoryField(), 'toys');
     await user.click(submit());
 
     expect(backend.addTransaction).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: -4, category: 'toys' })
+      expect.objectContaining({ amountMinor: -425, category: 'toys' })
     );
   });
 
-  it('writes amount, category and comment, attributed to the signed-in user', async () => {
+  it('writes the amount in hundredths, attributed to the signed-in user', async () => {
     const { backend, user } = setup();
 
-    await user.type(amountField(), '12');
+    await user.type(amountField(), '12.50');
     await user.selectOptions(categoryField(), 'gift');
     await user.type(screen.getByLabelText(/comment/i), 'birthday');
     await user.click(submit());
 
     expect(backend.addTransaction).toHaveBeenCalledWith({
-      amount: 12,
+      amountMinor: 1250,
       comment: 'birthday',
       category: 'gift',
       user: 'parent@example.com',

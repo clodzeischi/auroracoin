@@ -1,7 +1,8 @@
 import { useTransactions } from '../hooks/useTransactions.js';
+import { formatMinor } from '../utils/money.js';
 
 export const CoinCount = () => {
-    const { totalCoins, loading, error } = useTransactions();
+    const { totalMinor, loading, error } = useTransactions();
 
     return (
         <section className="balance" aria-label="Total balance">
@@ -10,7 +11,7 @@ export const CoinCount = () => {
                 <p className="balance-error">Couldn't load the balance.</p>
             ) : (
                 <p className="balance-value">
-                    {loading ? '—' : totalCoins}
+                    {loading ? '—' : formatMinor(totalMinor)}
                     <span className="balance-unit">coins</span>
                 </p>
             )}

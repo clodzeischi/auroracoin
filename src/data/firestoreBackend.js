@@ -15,11 +15,23 @@ import { UNCATEGORIZED } from './categories.js';
 
 const COLLECTION = 'transactions';
 
+/**
+ * Documents written before money became decimal store `amount` as a whole
+ * number of coins. They are read as hundredths so the ledger stays correct
+ * before a migration runs; the distinct field name is what makes telling
+ * them apart possible at all.
+ */
+const readAmountMinor = (data) => {
+  if (Number.isFinite(data.amountMinor)) return data.amountMinor;
+  if (Number.isFinite(data.amount)) return data.amount * 100;
+  return null;
+};
+
 const toTransaction = (doc) => {
   const data = doc.data();
   return {
     id: doc.id,
-    amount: data.amount,
+    amountMinor: readAmountMinor(data),
     comment: data.comment,
     // Documents written before categories existed have no field at all.
     category: data.category ?? UNCATEGORIZED,
@@ -56,11 +68,11 @@ export const createFirestoreBackend = () => ({
     );
   },
 
-  updateTransaction(id, { amount, comment, category, editedBy }) {
+  updateTransaction(id, { amountMinor, comment, category, editedBy }) {
     // user and timestamp are deliberately not sent: the rules pin them to
     // their existing values, so an edit cannot rewrite authorship or date.
     return updateDoc(doc(getDb(), COLLECTION, id), {
-      amount,
+      amountMinor,
       comment,
       category,
       editedBy,
@@ -72,9 +84,9 @@ export const createFirestoreBackend = () => ({
     return deleteDoc(doc(getDb(), COLLECTION, id));
   },
 
-  addTransaction({ amount, comment, category, user }) {
+  addTransaction({ amountMinor, comment, category, user }) {
     return addDoc(collection(getDb(), COLLECTION), {
-      amount,
+      amountMinor,
       comment,
       category,
       user,

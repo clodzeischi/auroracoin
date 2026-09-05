@@ -43,14 +43,14 @@ const normalize = (category) => (isValidCategory(category) ? category : UNCATEGO
 
 const toRows = (totals, directionTotal) =>
   [...totals.entries()]
-    .map(([category, amount]) => ({
+    .map(([category, amountMinor]) => ({
       category,
-      amount,
+      amountMinor,
       // Each direction is its own denominator: spending is a share of
       // spending, not of everything that moved.
-      share: directionTotal > 0 ? (amount / directionTotal) * 100 : 0,
+      share: directionTotal > 0 ? (amountMinor / directionTotal) * 100 : 0,
     }))
-    .sort((a, b) => b.amount - a.amount);
+    .sort((a, b) => b.amountMinor - a.amountMinor);
 
 export function summarize(transactions) {
   const earnedByCategory = new Map();
@@ -60,7 +60,7 @@ export function summarize(transactions) {
   let count = 0;
 
   for (const transaction of transactions) {
-    const { amount } = transaction;
+    const amount = transaction.amountMinor;
     if (!Number.isFinite(amount) || amount === 0) continue;
 
     count += 1;
@@ -77,9 +77,9 @@ export function summarize(transactions) {
   }
 
   return {
-    earned: { total: earnedTotal, byCategory: toRows(earnedByCategory, earnedTotal) },
-    spent: { total: spentTotal, byCategory: toRows(spentByCategory, spentTotal) },
-    net: earnedTotal - spentTotal,
+    earned: { totalMinor: earnedTotal, byCategory: toRows(earnedByCategory, earnedTotal) },
+    spent: { totalMinor: spentTotal, byCategory: toRows(spentByCategory, spentTotal) },
+    netMinor: earnedTotal - spentTotal,
     count,
   };
 }

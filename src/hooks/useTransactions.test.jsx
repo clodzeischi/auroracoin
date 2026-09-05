@@ -27,10 +27,10 @@ describe('useTransactions', () => {
     const { result } = renderHook(() => useTransactions(backend));
 
     act(() =>
-      backend.emitTransactions([tx({ amount: 5 }), tx({ amount: 12 }), tx({ amount: -3 })])
+      backend.emitTransactions([tx({ amountMinor: 5 }), tx({ amountMinor: 12 }), tx({ amountMinor: -3 })])
     );
 
-    expect(result.current.totalCoins).toBe(14);
+    expect(result.current.totalMinor).toBe(14);
   });
 
   it('ignores non-numeric amounts so one malformed document cannot NaN the total', () => {
@@ -39,14 +39,14 @@ describe('useTransactions', () => {
 
     act(() =>
       backend.emitTransactions([
-        tx({ amount: 10 }),
-        tx({ amount: undefined }),
-        tx({ amount: 'twelve' }),
-        tx({ amount: 5 }),
+        tx({ amountMinor: 10 }),
+        tx({ amountMinor: undefined }),
+        tx({ amountMinor: 'twelve' }),
+        tx({ amountMinor: 5 }),
       ])
     );
 
-    expect(result.current.totalCoins).toBe(15);
+    expect(result.current.totalMinor).toBe(15);
   });
 
   it('surfaces a subscription error instead of silently showing a zero balance', () => {

@@ -1,7 +1,7 @@
 export const TableRow = ({ data, onEdit, onDelete }) => {
 
-    const tone = data.amount >= 0 ? 'earned' : 'spent';
-    const display = data.amount > 0 ? `+${data.amount}` : String(data.amount);
+    const tone = data.amountMinor >= 0 ? 'earned' : 'spent';
+    const display = data.display;
     const describe = `${display} coins, ${data.category}`;
 
     return (

@@ -1,23 +1,16 @@
 import {useEffect, useRef, useState} from "react";
 import {getBackend} from "../data/index.js";
 import {categoriesForAmount} from "../data/categories.js";
+import {parseAmountInput, formatMinor} from "../utils/money.js";
 
-/**
- * Coins are whole units. Returns null for anything we refuse to write, so the
- * client and the Firestore rule (`amount is int`) agree on what is valid.
- */
-const parseAmount = (raw) => {
-    const trimmed = String(raw).trim();
-    if (trimmed === '') return null;
-    const value = Number(trimmed);
-    if (!Number.isInteger(value) || value === 0) return null;
-    return value;
-};
+// Amounts are entered as decimals and stored as integer hundredths, which is
+// also what the Firestore rule validates (`amountMinor is int`).
+const parseAmount = parseAmountInput;
 
 export const CoinForm = ({ isOpen, toggle, user, backend = getBackend(), transaction = null }) => {
 
     const isEditing = Boolean(transaction);
-    const [amount, setAmount] = useState(isEditing ? String(transaction.amount) : '');
+    const [amount, setAmount] = useState(isEditing ? formatMinor(transaction.amountMinor) : '');
     const [category, setCategory] = useState(transaction?.category ?? '');
     const [comment, setComment] = useState(transaction?.comment ?? '');
     const [loading, setLoading] = useState(false);
@@ -56,7 +49,7 @@ export const CoinForm = ({ isOpen, toggle, user, backend = getBackend(), transac
 
     const handleSubmit = async () => {
         if (parsedAmount === null) {
-            setError('Enter a non-zero whole number of coins.');
+            setError('Enter a non-zero amount with up to two decimal places.');
             return;
         }
         if (!category) {
@@ -75,14 +68,14 @@ export const CoinForm = ({ isOpen, toggle, user, backend = getBackend(), transac
                 // Authorship and date are not sent: the rules pin them, so an
                 // edit records who changed it without rewriting who made it.
                 await backend.updateTransaction(transaction.id, {
-                    amount: parsedAmount,
+                    amountMinor: parsedAmount,
                     comment,
                     category,
                     editedBy: user.email,
                 });
             } else {
                 await backend.addTransaction({
-                    amount: parsedAmount,
+                    amountMinor: parsedAmount,
                     comment,
                     category,
                     user: user.email,
@@ -123,6 +116,8 @@ export const CoinForm = ({ isOpen, toggle, user, backend = getBackend(), transac
                         <input
                             ref={amountRef}
                             type="number"
+                            inputMode="decimal"
+                            step="0.01"
                             id="amount"
                             value={amount}
                             onChange={e => handleAmountChange(e.target.value)}

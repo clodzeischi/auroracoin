@@ -6,6 +6,7 @@ import {useTransactions} from "../hooks/useTransactions.js";
 import {getBackend} from "../data/index.js";
 import {categoryLabel} from "../data/categories.js";
 import {formatEditedNote} from "../utils/format.js";
+import {formatMinorSigned} from "../utils/money.js";
 
 const formatTime = (timestamp) =>
     timestamp
@@ -60,7 +61,8 @@ export const CoinTable = ({ backend, user }) => {
                                     onEdit={() => setEditing(transaction)}
                                     onDelete={() => setConfirming(transaction)}
                                     data={{
-                                        amount: transaction.amount,
+                                        amountMinor: transaction.amountMinor,
+                                        display: formatMinorSigned(transaction.amountMinor),
                                         category: categoryLabel(transaction.category),
                                         time: formatTime(transaction.timestamp),
                                         user: transaction.user || '—',
@@ -88,7 +90,7 @@ export const CoinTable = ({ backend, user }) => {
                 isOpen={Boolean(confirming)}
                 title="Delete this transaction?"
                 detail={confirming
-                    ? `${confirming.amount > 0 ? '+' : ''}${confirming.amount} coins · ${categoryLabel(confirming.category)}`
+                    ? `${formatMinorSigned(confirming.amountMinor)} coins · ${categoryLabel(confirming.category)}`
                     : ''}
                 confirmLabel="Delete"
                 onConfirm={confirmDelete}

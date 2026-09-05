@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTransactions } from '../hooks/useTransactions.js';
 import { categoryLabel } from '../data/categories.js';
+import { formatMinor, formatMinorSigned } from '../utils/money.js';
 import { TIMEFRAMES, rangeFor, filterByRange, summarize } from '../analytics/summarize.js';
 
 // Colour encodes direction only — green in, violet out. Category identity is
@@ -10,7 +11,7 @@ const Breakdown = ({ title, rows, total, tone }) => (
     <section aria-label={title}>
         <div className="bd-head">
             <h3 className="bd-title">{title}</h3>
-            <span className="bd-total">{total}</span>
+            <span className="bd-total">{formatMinor(total)}</span>
         </div>
         {rows.length === 0 ? (
             <p className="bd-empty">Nothing in this period.</p>
@@ -21,7 +22,7 @@ const Breakdown = ({ title, rows, total, tone }) => (
                         <div className="bd-row-top">
                             <span className="bd-name">{categoryLabel(row.category)}</span>
                             <span className="bd-figures">
-                                {row.amount}
+                                {formatMinor(row.amountMinor)}
                                 <span className="bd-share">{Math.round(row.share)}%</span>
                             </span>
                         </div>
@@ -75,12 +76,9 @@ export const CoinDashboard = ({ backend, now }) => {
         <div className="card">
             <div className="card-head">
                 <div className="stats">
-                    <Stat label="Earned" value={summary.earned.total} tone="earned" />
-                    <Stat label="Spent" value={summary.spent.total} tone="spent" />
-                    <Stat
-                        label="Net"
-                        value={`${summary.net >= 0 ? '+' : ''}${summary.net}`}
-                    />
+                    <Stat label="Earned" value={formatMinor(summary.earned.totalMinor)} tone="earned" />
+                    <Stat label="Spent" value={formatMinor(summary.spent.totalMinor)} tone="spent" />
+                    <Stat label="Net" value={formatMinorSigned(summary.netMinor)} />
                 </div>
                 <div>
                     <label htmlFor="timeframe" className="sr-only">Timeframe</label>
@@ -104,13 +102,13 @@ export const CoinDashboard = ({ backend, now }) => {
                     <Breakdown
                         title="Earned breakdown"
                         rows={summary.earned.byCategory}
-                        total={summary.earned.total}
+                        total={summary.earned.totalMinor}
                         tone="earned"
                     />
                     <Breakdown
                         title="Spent breakdown"
                         rows={summary.spent.byCategory}
-                        total={summary.spent.total}
+                        total={summary.spent.totalMinor}
                         tone="spent"
                     />
                 </div>

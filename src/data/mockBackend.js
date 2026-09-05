@@ -11,7 +11,7 @@ const nextId = () => `mock-${++idCounter}`;
 const seedTransactions = () => [
   {
     id: 'seed-1',
-    amount: 10,
+    amountMinor: 1000,
     comment: 'Tidied her room all week',
     category: 'chores',
     user: 'parent@example.com',
@@ -19,7 +19,7 @@ const seedTransactions = () => [
   },
   {
     id: 'seed-2',
-    amount: -4,
+    amountMinor: -450,
     comment: 'Spent on stickers',
     category: 'treats',
     user: 'parent@example.com',
@@ -27,7 +27,7 @@ const seedTransactions = () => [
   },
   {
     id: 'seed-3',
-    amount: 25,
+    amountMinor: 2500,
     comment: 'Birthday from Grandma',
     category: 'gift',
     user: 'otherparent@example.com',
@@ -76,11 +76,11 @@ export const createMockBackend = () => {
       return () => dataListeners.delete(onData);
     },
 
-    updateTransaction(id, { amount, comment, category, editedBy }) {
+    updateTransaction(id, { amountMinor, comment, category, editedBy }) {
       transactions = transactions.map((transaction) =>
         transaction.id === id
           // Spread first so author and timestamp survive the edit.
-          ? { ...transaction, amount, comment, category, editedBy, editedAt: new Date() }
+          ? { ...transaction, amountMinor, comment, category, editedBy, editedAt: new Date() }
           : transaction
       );
       notifyData();
@@ -93,10 +93,10 @@ export const createMockBackend = () => {
       return Promise.resolve();
     },
 
-    addTransaction({ amount, comment, category, user: author }) {
+    addTransaction({ amountMinor, comment, category, user: author }) {
       transactions = [
         ...transactions,
-        { id: nextId(), amount, comment, category, user: author, timestamp: new Date() },
+        { id: nextId(), amountMinor, comment, category, user: author, timestamp: new Date() },
       ];
       notifyData();
       return Promise.resolve();

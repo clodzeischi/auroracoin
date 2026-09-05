@@ -58,7 +58,7 @@ describe('createFirestoreBackend', () => {
     handleSnapshot(
       snapshotOf([
         firestoreDoc('abc123', {
-          amount: 5,
+          amountMinor: 550,
           comment: 'tidied her room',
           category: 'chores',
           user: 'parent@example.com',
@@ -70,7 +70,7 @@ describe('createFirestoreBackend', () => {
     expect(onData).toHaveBeenCalledWith([
       {
         id: 'abc123',
-        amount: 5,
+        amountMinor: 550,
         comment: 'tidied her room',
         category: 'chores',
         user: 'parent@example.com',
@@ -86,7 +86,7 @@ describe('createFirestoreBackend', () => {
     createFirestoreBackend().subscribeToTransactions(onData, vi.fn());
 
     const handleSnapshot = onSnapshot.mock.calls[0][1];
-    handleSnapshot(snapshotOf([firestoreDoc('legacy', { amount: 5, timestamp: null })]));
+    handleSnapshot(snapshotOf([firestoreDoc('legacy', { amountMinor: 500, timestamp: null })]));
 
     expect(onData.mock.lastCall[0][0].category).toBe('uncategorized');
   });
@@ -96,7 +96,7 @@ describe('createFirestoreBackend', () => {
     createFirestoreBackend().subscribeToTransactions(onData, vi.fn());
 
     const handleSnapshot = onSnapshot.mock.calls[0][1];
-    handleSnapshot(snapshotOf([firestoreDoc('pending', { amount: 1, timestamp: null })]));
+    handleSnapshot(snapshotOf([firestoreDoc('pending', { amountMinor: 100, timestamp: null })]));
 
     expect(onData.mock.lastCall[0][0].timestamp).toBeNull();
   });
@@ -110,7 +110,7 @@ describe('createFirestoreBackend', () => {
 
   it('writes a transaction with a server-generated timestamp', async () => {
     await createFirestoreBackend().addTransaction({
-      amount: 12,
+      amountMinor: 1250,
       comment: 'birthday',
       category: 'gift',
       user: 'parent@example.com',
@@ -118,7 +118,7 @@ describe('createFirestoreBackend', () => {
 
     expect(serverTimestamp).toHaveBeenCalled();
     expect(addDoc).toHaveBeenCalledWith(expect.anything(), {
-      amount: 12,
+      amountMinor: 1250,
       comment: 'birthday',
       category: 'gift',
       user: 'parent@example.com',
@@ -134,7 +134,7 @@ describe('createFirestoreBackend', () => {
     handleSnapshot(
       snapshotOf([
         firestoreDoc('edited', {
-          amount: 5,
+          amountMinor: 500,
           timestamp: null,
           editedBy: 'parent2@example.com',
           editedAt: { toDate: () => new Date('2026-09-03T00:00:00Z') },
@@ -152,7 +152,7 @@ describe('createFirestoreBackend', () => {
     createFirestoreBackend().subscribeToTransactions(onData, vi.fn());
 
     const handleSnapshot = onSnapshot.mock.calls[0][1];
-    handleSnapshot(snapshotOf([firestoreDoc('fresh', { amount: 5, timestamp: null })]));
+    handleSnapshot(snapshotOf([firestoreDoc('fresh', { amountMinor: 500, timestamp: null })]));
 
     expect(onData.mock.lastCall[0][0].editedBy).toBeNull();
     expect(onData.mock.lastCall[0][0].editedAt).toBeNull();
@@ -162,7 +162,7 @@ describe('createFirestoreBackend', () => {
     // user and timestamp are absent on purpose: the rules pin them to their
     // existing values, so sending them would be rejected.
     await createFirestoreBackend().updateTransaction('abc123', {
-      amount: 7,
+      amountMinor: 725,
       comment: 'fixed',
       category: 'chores',
       editedBy: 'parent2@example.com',
@@ -170,7 +170,7 @@ describe('createFirestoreBackend', () => {
 
     expect(doc).toHaveBeenCalledWith(expect.anything(), 'transactions', 'abc123');
     expect(updateDoc).toHaveBeenCalledWith(expect.anything(), {
-      amount: 7,
+      amountMinor: 725,
       comment: 'fixed',
       category: 'chores',
       editedBy: 'parent2@example.com',
@@ -183,6 +183,30 @@ describe('createFirestoreBackend', () => {
 
     expect(doc).toHaveBeenCalledWith(expect.anything(), 'transactions', 'abc123');
     expect(deleteDoc).toHaveBeenCalled();
+  });
+
+  it('reads a pre-decimal document as whole coins', () => {
+    // Written before money became decimal: `amount: 10` meant ten coins, so
+    // it must read back as 1000 hundredths, not 10.
+    const onData = vi.fn();
+    createFirestoreBackend().subscribeToTransactions(onData, vi.fn());
+
+    const handleSnapshot = onSnapshot.mock.calls[0][1];
+    handleSnapshot(snapshotOf([firestoreDoc('old', { amount: 10, timestamp: null })]));
+
+    expect(onData.mock.lastCall[0][0].amountMinor).toBe(1000);
+  });
+
+  it('prefers the new field when a document somehow carries both', () => {
+    const onData = vi.fn();
+    createFirestoreBackend().subscribeToTransactions(onData, vi.fn());
+
+    const handleSnapshot = onSnapshot.mock.calls[0][1];
+    handleSnapshot(
+      snapshotOf([firestoreDoc('both', { amount: 10, amountMinor: 250, timestamp: null })])
+    );
+
+    expect(onData.mock.lastCall[0][0].amountMinor).toBe(250);
   });
 
   it('delegates auth to the Firebase SDK', async () => {

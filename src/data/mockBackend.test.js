@@ -52,7 +52,7 @@ describe('createMockBackend', () => {
     const onData = vi.fn();
     backend.subscribeToTransactions(onData);
 
-    const amounts = onData.mock.lastCall[0].map((t) => t.amount);
+    const amounts = onData.mock.lastCall[0].map((t) => t.amountMinor);
     expect(amounts.some((a) => a > 0)).toBe(true);
     expect(amounts.some((a) => a < 0)).toBe(true);
   });
@@ -63,7 +63,7 @@ describe('createMockBackend', () => {
     backend.subscribeToTransactions(onData);
 
     await backend.addTransaction({
-      amount: -6,
+      amountMinor: -600,
       comment: 'lego',
       category: 'toys',
       user: 'parent@example.com',
@@ -79,14 +79,14 @@ describe('createMockBackend', () => {
     backend.subscribeToTransactions(first);
     backend.subscribeToTransactions(second);
 
-    await backend.addTransaction({ amount: 7, comment: 'chores', user: 'kid@example.com' });
+    await backend.addTransaction({ amountMinor: 700, comment: 'chores', user: 'kid@example.com' });
 
     expect(first.mock.lastCall[0][0]).toMatchObject({
-      amount: 7,
+      amountMinor: 700,
       comment: 'chores',
       user: 'kid@example.com',
     });
-    expect(second.mock.lastCall[0][0].amount).toBe(7);
+    expect(second.mock.lastCall[0][0].amountMinor).toBe(700);
   });
 
   it('stamps added transactions with an id and a timestamp, as Firestore would', async () => {
@@ -94,7 +94,7 @@ describe('createMockBackend', () => {
     const onData = vi.fn();
     backend.subscribeToTransactions(onData);
 
-    await backend.addTransaction({ amount: 1, comment: '', user: 'a@example.com' });
+    await backend.addTransaction({ amountMinor: 100, comment: '', user: 'a@example.com' });
     const added = onData.mock.lastCall[0][0];
 
     expect(added.id).toEqual(expect.any(String));
@@ -108,7 +108,7 @@ describe('createMockBackend', () => {
     const callsBefore = onData.mock.calls.length;
 
     unsubscribe();
-    await backend.addTransaction({ amount: 3, comment: '', user: 'a@example.com' });
+    await backend.addTransaction({ amountMinor: 300, comment: '', user: 'a@example.com' });
 
     expect(onData).toHaveBeenCalledTimes(callsBefore);
   });
@@ -120,14 +120,14 @@ describe('createMockBackend', () => {
     const original = onData.mock.lastCall[0][0];
 
     await backend.updateTransaction(original.id, {
-      amount: 99,
+      amountMinor: 9900,
       comment: 'corrected',
       category: 'bonus',
       editedBy: 'parent2@example.com',
     });
 
     const updated = onData.mock.lastCall[0].find((t) => t.id === original.id);
-    expect(updated).toMatchObject({ amount: 99, comment: 'corrected', category: 'bonus' });
+    expect(updated).toMatchObject({ amountMinor: 9900, comment: 'corrected', category: 'bonus' });
   });
 
   it('records who edited a transaction and when', async () => {
@@ -137,7 +137,7 @@ describe('createMockBackend', () => {
     const original = onData.mock.lastCall[0][0];
 
     await backend.updateTransaction(original.id, {
-      amount: 12,
+      amountMinor: 1200,
       comment: '',
       category: 'bonus',
       editedBy: 'parent2@example.com',
@@ -156,7 +156,7 @@ describe('createMockBackend', () => {
     const original = onData.mock.lastCall[0][0];
 
     await backend.updateTransaction(original.id, {
-      amount: 1,
+      amountMinor: 100,
       comment: '',
       category: 'bonus',
       editedBy: 'parent2@example.com',

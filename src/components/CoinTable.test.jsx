@@ -6,7 +6,7 @@ import { createFakeBackend } from '../test/fakeBackend.js';
 
 const tx = (over = {}) => ({
   id: 'tx-1',
-  amount: 10,
+  amountMinor: 1000,
   category: 'chores',
   comment: 'tidied her room',
   user: 'parent@example.com',
@@ -26,7 +26,7 @@ const setup = (transactions = [tx()]) => {
 describe('CoinTable', () => {
   it('turns each amount into a control, so a keyboard reaches every entry', () => {
     setup();
-    expect(screen.getByRole('button', { name: /edit transaction.*\+10/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /edit transaction.*\+10\.00/i })).toBeInTheDocument();
   });
 
   it('opens the editor prefilled when an entry is clicked', async () => {
@@ -45,11 +45,11 @@ describe('CoinTable', () => {
 
     await user.click(screen.getByRole('button', { name: /edit transaction/i }));
     await user.clear(screen.getByLabelText(/amount/i));
-    await user.type(screen.getByLabelText(/amount/i), '15');
+    await user.type(screen.getByLabelText(/amount/i), '15.75');
     await user.click(screen.getByRole('button', { name: /save/i }));
 
     expect(backend.updateTransaction).toHaveBeenCalledWith('tx-1', {
-      amount: 15,
+      amountMinor: 1575,
       comment: 'tidied her room',
       category: 'chores',
       editedBy: 'parent2@example.com',

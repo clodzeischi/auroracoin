@@ -39,7 +39,7 @@ export const createFakeBackend = () => {
 
 export const tx = (overrides = {}) => ({
   id: 'tx-1',
-  amount: 5,
+  amountMinor: 500,
   comment: 'tidied her room',
   category: 'chores',
   user: 'parent@example.com',

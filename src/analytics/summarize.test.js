@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { rangeFor, filterByRange, summarize, TIMEFRAMES } from './summarize.js';
 
 const at = (iso) => new Date(iso);
-const tx = (amount, category, iso) => ({
-  id: `${amount}-${category}-${iso}`,
-  amount,
+const tx = (amountMinor, category, iso) => ({
+  id: `${amountMinor}-${category}-${iso}`,
+  amountMinor,
   category,
   comment: '',
   user: 'parent@example.com',
@@ -67,9 +67,9 @@ describe('filterByRange', () => {
 describe('summarize', () => {
   it('returns zeroed totals for an empty ledger without dividing by zero', () => {
     const result = summarize([]);
-    expect(result.earned.total).toBe(0);
-    expect(result.spent.total).toBe(0);
-    expect(result.net).toBe(0);
+    expect(result.earned.totalMinor).toBe(0);
+    expect(result.spent.totalMinor).toBe(0);
+    expect(result.netMinor).toBe(0);
     expect(result.earned.byCategory).toEqual([]);
     expect(result.spent.byCategory).toEqual([]);
   });
@@ -79,9 +79,9 @@ describe('summarize', () => {
       tx(10, 'chores', '2026-09-01T00:00:00Z'),
       tx(-4, 'toys', '2026-09-02T00:00:00Z'),
     ]);
-    expect(result.earned.total).toBe(10);
-    expect(result.spent.total).toBe(4);
-    expect(result.net).toBe(6);
+    expect(result.earned.totalMinor).toBe(10);
+    expect(result.spent.totalMinor).toBe(4);
+    expect(result.netMinor).toBe(6);
   });
 
   it('groups by category and sums within each', () => {
@@ -91,7 +91,7 @@ describe('summarize', () => {
       tx(25, 'gift', '2026-09-03T00:00:00Z'),
     ]);
     const chores = result.earned.byCategory.find((c) => c.category === 'chores');
-    expect(chores.amount).toBe(15);
+    expect(chores.amountMinor).toBe(15);
     expect(result.earned.byCategory).toHaveLength(2);
   });
 
@@ -127,7 +127,7 @@ describe('summarize', () => {
     ]);
     expect(result.earned.byCategory).toHaveLength(1);
     expect(result.earned.byCategory[0].category).toBe('uncategorized');
-    expect(result.earned.byCategory[0].amount).toBe(15);
+    expect(result.earned.byCategory[0].amountMinor).toBe(15);
   });
 
   it('ignores non-numeric amounts, consistent with the running total', () => {
@@ -136,7 +136,7 @@ describe('summarize', () => {
       tx('twelve', 'gift', '2026-09-02T00:00:00Z'),
       tx(undefined, 'bonus', '2026-09-03T00:00:00Z'),
     ]);
-    expect(result.earned.total).toBe(10);
+    expect(result.earned.totalMinor).toBe(10);
     expect(result.earned.byCategory).toHaveLength(1);
   });
 
