@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createMockBackend, MOCK_FAMILY_ID, MOCK_CHILD_ID } from './mockBackend.js';
+import {
+  createMockBackend, MOCK_FAMILY_ID, MOCK_CHILD_ID,
+  MOCK_PAIRED_DEVICE_UID, MOCK_UNPAIRED_DEVICE_UID,
+} from './mockBackend.js';
+import { PAIRING_EXPIRED, PAIRING_TTL_MINUTES, PAIRING_UNKNOWN } from './pairing.js';
 
 // The seeded child's ledger - the interface components actually consume.
 const ledgerOf = (backend) => backend.ledgerFor(MOCK_FAMILY_ID, MOCK_CHILD_ID);
@@ -227,5 +231,162 @@ describe('createMockBackend', () => {
     await backend.login();
 
     expect(onAuth).toHaveBeenCalledTimes(callsBefore);
+  });
+});
+
+describe('ledger handle caching', () => {
+  // Mirrors firestoreBackend: components key their subscription effect on the
+  // ledger's identity, so it has to be stable across renders.
+  it('returns the same handle for the same child', () => {
+    const backend = createMockBackend();
+    expect(ledgerOf(backend)).toBe(ledgerOf(backend));
+  });
+
+  it('keeps different children on different handles', () => {
+    const backend = createMockBackend();
+    expect(backend.ledgerFor(MOCK_FAMILY_ID, 'a')).not.toBe(backend.ledgerFor(MOCK_FAMILY_ID, 'b'));
+  });
+});
+
+describe('pairing a child device', () => {
+  it('seeds a device already paired, so the child persona has something to show', () => {
+    const onData = vi.fn();
+    createMockBackend().subscribeToDevice(MOCK_PAIRED_DEVICE_UID, onData);
+
+    expect(onData.mock.lastCall[0]).toMatchObject({
+      familyId: MOCK_FAMILY_ID,
+      childId: MOCK_CHILD_ID,
+    });
+  });
+
+  it('leaves the second device unpaired, so the pairing screen can be walked', () => {
+    const onData = vi.fn();
+    createMockBackend().subscribeToDevice(MOCK_UNPAIRED_DEVICE_UID, onData);
+
+    expect(onData.mock.lastCall[0]).toBeNull();
+  });
+
+  it('lists a new code as outstanding for the family', async () => {
+    const backend = createMockBackend();
+    const onData = vi.fn();
+    backend.subscribeToPairings(MOCK_FAMILY_ID, onData);
+
+    const code = await backend.createPairingCode(MOCK_FAMILY_ID, MOCK_CHILD_ID);
+
+    expect(onData.mock.lastCall[0]).toEqual([
+      expect.objectContaining({ code, childId: MOCK_CHILD_ID }),
+    ]);
+  });
+
+  it('pairs the device to the child the code named', async () => {
+    const backend = createMockBackend();
+    const onDevice = vi.fn();
+    backend.subscribeToDevice(MOCK_UNPAIRED_DEVICE_UID, onDevice);
+
+    const code = await backend.createPairingCode(MOCK_FAMILY_ID, 'mock-child-2');
+    await backend.redeemPairingCode(code, MOCK_UNPAIRED_DEVICE_UID);
+
+    expect(onDevice.mock.lastCall[0]).toMatchObject({
+      familyId: MOCK_FAMILY_ID,
+      childId: 'mock-child-2',
+    });
+  });
+
+  it('spends the code, so the same one cannot pair a second device', async () => {
+    const backend = createMockBackend();
+    const code = await backend.createPairingCode(MOCK_FAMILY_ID, MOCK_CHILD_ID);
+    await backend.redeemPairingCode(code, MOCK_UNPAIRED_DEVICE_UID);
+
+    await expect(backend.redeemPairingCode(code, 'another-device'))
+      .rejects.toMatchObject({ reason: PAIRING_UNKNOWN });
+  });
+
+  it('accepts a code typed in lower case with the spaces people read out', async () => {
+    const backend = createMockBackend();
+    const code = await backend.createPairingCode(MOCK_FAMILY_ID, MOCK_CHILD_ID);
+
+    await expect(
+      backend.redeemPairingCode(` ${code.toLowerCase()} `, MOCK_UNPAIRED_DEVICE_UID)
+    ).resolves.toBeUndefined();
+  });
+
+  it('refuses a code nobody made', async () => {
+    await expect(createMockBackend().redeemPairingCode('ZZZ999', 'device'))
+      .rejects.toMatchObject({ reason: PAIRING_UNKNOWN });
+  });
+
+  it('refuses a code once its window has passed', async () => {
+    vi.useFakeTimers();
+    try {
+      const backend = createMockBackend();
+      const code = await backend.createPairingCode(MOCK_FAMILY_ID, MOCK_CHILD_ID);
+      vi.advanceTimersByTime((PAIRING_TTL_MINUTES + 1) * 60 * 1000);
+
+      await expect(backend.redeemPairingCode(code, 'device'))
+        .rejects.toMatchObject({ reason: PAIRING_EXPIRED });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('lets a parent revoke a device that is already paired', async () => {
+    const backend = createMockBackend();
+    const onDevice = vi.fn();
+    backend.subscribeToDevice(MOCK_PAIRED_DEVICE_UID, onDevice);
+
+    await backend.unpairDevice(MOCK_PAIRED_DEVICE_UID);
+
+    expect(onDevice.mock.lastCall[0]).toBeNull();
+  });
+
+  /**
+   * Firestore cascades nothing, so a device left pointing at a deleted child
+   * would sit on a ledger that no longer exists - and would keep the family
+   * document readable to it.
+   */
+  it('unpairs devices belonging to a child that is deleted', async () => {
+    const backend = createMockBackend();
+    const onDevice = vi.fn();
+    backend.subscribeToDevice(MOCK_PAIRED_DEVICE_UID, onDevice);
+
+    await backend.deleteChild(MOCK_FAMILY_ID, MOCK_CHILD_ID);
+
+    expect(onDevice.mock.lastCall[0]).toBeNull();
+  });
+
+  it('leaves a sibling\'s device alone when one child is deleted', async () => {
+    const backend = createMockBackend();
+    const onDevice = vi.fn();
+    backend.subscribeToDevice(MOCK_PAIRED_DEVICE_UID, onDevice);
+
+    await backend.deleteChild(MOCK_FAMILY_ID, 'mock-child-2');
+
+    expect(onDevice.mock.lastCall[0]).not.toBeNull();
+  });
+});
+
+describe('deleting a child cleans up after it', () => {
+  it('leaves no unredeemed code that could still pair a device to it', async () => {
+    const backend = createMockBackend();
+    const onPairings = vi.fn();
+    backend.subscribeToPairings(MOCK_FAMILY_ID, onPairings);
+    const code = await backend.createPairingCode(MOCK_FAMILY_ID, MOCK_CHILD_ID);
+
+    await backend.deleteChild(MOCK_FAMILY_ID, MOCK_CHILD_ID);
+
+    expect(onPairings.mock.lastCall[0]).toEqual([]);
+    await expect(backend.redeemPairingCode(code, 'device'))
+      .rejects.toMatchObject({ reason: PAIRING_UNKNOWN });
+  });
+
+  it("keeps a sibling's outstanding code", async () => {
+    const backend = createMockBackend();
+    const onPairings = vi.fn();
+    backend.subscribeToPairings(MOCK_FAMILY_ID, onPairings);
+    const code = await backend.createPairingCode(MOCK_FAMILY_ID, 'mock-child-2');
+
+    await backend.deleteChild(MOCK_FAMILY_ID, MOCK_CHILD_ID);
+
+    expect(onPairings.mock.lastCall[0]).toEqual([expect.objectContaining({ code })]);
   });
 });

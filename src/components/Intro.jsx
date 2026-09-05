@@ -1,4 +1,4 @@
-export const Intro = ({ onSignIn }) => (
+export const Intro = ({ onSignIn, onPairDevice }) => (
     <main className="intro">
         <h1 className="intro-title">A bank account for your kid<br />that you actually hold.</h1>
 
@@ -27,7 +27,10 @@ export const Intro = ({ onSignIn }) => (
         </div>
 
         <p className="intro-pair">
-            Setting up a child's device? Ask a parent for a pairing code.
+            Setting up a child's device?{' '}
+            <button type="button" className="link-btn link-inline" onClick={onPairDevice}>
+                Pair it with a code
+            </button>
         </p>
     </main>
 );

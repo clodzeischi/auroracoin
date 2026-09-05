@@ -17,15 +17,14 @@ describe('roleFor', () => {
     expect(roleFor({ isAnonymous: true })).toBe(CHILD);
   });
 
-  it('lets an explicit role win, for when membership documents land', () => {
-    // Today role is derived from the session; with families it will be read
-    // off families/{fid}/members/{uid}. This is the seam for that.
-    expect(roleFor({ email: 'a@b.com', role: CHILD })).toBe(CHILD);
-    expect(roleFor({ isAnonymous: true, role: PARENT })).toBe(PARENT);
-  });
-
-  it('ignores a role it does not recognise rather than trusting it', () => {
-    expect(roleFor({ email: 'a@b.com', role: 'admin' })).toBe(PARENT);
+  /**
+   * The persona is derived, never read off the session object. A mock user
+   * carries a `persona` field for the dev banner, and it must not be able to
+   * turn an anonymous device into a parent.
+   */
+  it('ignores any role-shaped field carried on the user', () => {
+    expect(roleFor({ isAnonymous: true, role: PARENT, persona: 'parent' })).toBe(CHILD);
+    expect(roleFor({ email: 'a@b.com', role: CHILD })).toBe(PARENT);
   });
 
   it('answers the two questions the UI actually asks', () => {

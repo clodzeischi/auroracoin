@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { RevocableList } from './RevocableList.jsx';
 
 const LOOKS_LIKE_EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -39,13 +40,13 @@ export const InviteParent = ({ pending = [], onInvite, onCancelInvite }) => {
                 <h2 className="card-title">Another parent</h2>
             </div>
 
-            <p className="state" style={{ marginBottom: 14 }}>
+            <p className="state invite-lede">
                 They'll need to sign in with this exact Google account. Both parents can
                 add, edit and remove transactions.
             </p>
 
             <div className="invite-row">
-                <div className="field" style={{ flex: 1, minWidth: 0 }}>
+                <div className="field">
                     <label htmlFor="invite-email">Google account email</label>
                     <input
                         id="invite-email"
@@ -61,28 +62,20 @@ export const InviteParent = ({ pending = [], onInvite, onCancelInvite }) => {
                 </button>
             </div>
 
-            {error && <div role="alert" className="alert" style={{ marginTop: 12 }}>{error}</div>}
+            {error && <div role="alert" className="alert invite-feedback">{error}</div>}
             {sentTo && !error && (
-                <p className="state" style={{ marginTop: 12 }}>Invite sent to {sentTo}.</p>
+                <p className="state invite-feedback">Invite sent to {sentTo}.</p>
             )}
 
-            {pending.length > 0 && (
-                <ul className="pending-list" aria-label="Pending invites">
-                    {pending.map((invite) => (
-                        <li key={invite.email}>
-                            <span>{invite.email}</span>
-                            <button
-                                type="button"
-                                className="link-btn is-danger"
-                                aria-label={`Cancel invite to ${invite.email}`}
-                                onClick={() => onCancelInvite(invite.email)}
-                            >
-                                Cancel
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            )}
+            <RevocableList
+                label="Pending invites"
+                items={pending.map((invite) => ({
+                    id: invite.email,
+                    label: invite.email,
+                    actionLabel: `Cancel invite to ${invite.email}`,
+                }))}
+                onRevoke={onCancelInvite}
+            />
         </section>
     );
 };

@@ -1,22 +1,33 @@
+import {
+  generatePairingCode,
+  normalizePairingCode,
+  pairingExpiry,
+  pairingFailure,
+  PAIRING_EXPIRED,
+  PAIRING_UNKNOWN,
+} from './pairing.js';
+
 export const MOCK_FAMILY_ID = 'mock-family';
 export const MOCK_CHILD_ID = 'mock-child';
 
+// `persona` is what the dev banner highlights. It lives on the mock user so
+// the banner never has to know which uid stands for which persona - roleFor()
+// ignores it and still derives the real answer from anonymity alone.
 const MOCK_PARENT = {
   uid: 'mock-parent-uid',
   email: 'parent@example.com',
   displayName: 'Constantin',
+  persona: 'parent',
 };
 
-// A paired child device: anonymous, no email, nothing identifying.
-const MOCK_CHILD_USER = {
-  uid: 'mock-child-uid',
-  isAnonymous: true,
-  displayName: 'Sparrow',
-  role: 'child',
-  // In production these come from the family's childDevices map at pairing.
-  familyId: MOCK_FAMILY_ID,
-  childId: MOCK_CHILD_ID,
-};
+// Two child devices, so both halves of the pairing flow can be walked in dev:
+// one already paired to Sparrow, one that has never redeemed a code.
+export const MOCK_PAIRED_DEVICE_UID = 'mock-device-paired';
+export const MOCK_UNPAIRED_DEVICE_UID = 'mock-device-unpaired';
+
+// A child device is anonymous: no email, nothing identifying. What it may see
+// comes from its device record, never from the session itself.
+const childUser = (uid, persona) => ({ uid, isAnonymous: true, persona });
 
 let idCounter = 0;
 const nextId = (prefix) => `${prefix}-${++idCounter}`;
@@ -78,12 +89,11 @@ export const createMockBackend = ({ seed = true } = {}) => {
   const children = new Map();          // familyId -> [{ id, name }]
   const ledgers = new Map();           // `${familyId}/${childId}` -> transactions[]
   const invites = new Map();           // email -> { email, familyId, invitedByName }
+  const devices = new Map();           // uid -> { id, familyId, childId }
+  const pairings = new Map();          // code -> { id, code, familyId, childId, expiresAt }
 
   let user = null;
   const authListeners = new Set();
-  const familyListeners = new Map();   // uid -> Set(cb)
-  const childListeners = new Map();    // familyId -> Set(cb)
-  const ledgerListeners = new Map();   // key -> Set(cb)
 
   const key = (familyId, childId) => `${familyId}/${childId}`;
   const listenersFor = (map, id) => {
@@ -94,30 +104,70 @@ export const createMockBackend = ({ seed = true } = {}) => {
   const familyOf = (uid) => {
     const ids = memberships.get(uid);
     if (!ids || ids.size === 0) return null;
-    return families.get([...ids][0]) ?? null;
+    return families.get([...ids].sort()[0]) ?? null;
   };
 
-  const inviteListeners = new Map();   // email -> Set(cb)
-  const pendingListeners = new Map();  // familyId -> Set(cb)
+  const childIn = (familyId, childId) =>
+    (children.get(familyId) ?? []).find((child) => child.id === childId) ?? null;
 
-  const notifyAuth = () => authListeners.forEach((l) => l(user));
-  const notifyFamily = (uid) => listenersFor(familyListeners, uid).forEach((l) => l(familyOf(uid)));
-  const notifyChildren = (familyId) =>
-    listenersFor(childListeners, familyId).forEach((l) => l([...(children.get(familyId) ?? [])]));
-
-  const notifyInvite = (email) =>
-    listenersFor(inviteListeners, email).forEach((l) => l(invites.get(email) ?? null));
-  const notifyPending = (familyId) =>
-    listenersFor(pendingListeners, familyId).forEach((l) =>
-      l([...invites.values()].filter((invite) => invite.familyId === familyId))
-    );
+  const byFamily = (map, familyId) =>
+    [...map.values()].filter((entry) => entry.familyId === familyId);
 
   const newestFirst = (list) =>
     [...list].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  const notifyLedger = (familyId, childId) => {
-    const rows = newestFirst(ledgers.get(key(familyId, childId)) ?? []);
-    listenersFor(ledgerListeners, key(familyId, childId)).forEach((l) => l(rows));
+
+  /**
+   * A feed binds a set of listeners to the one expression that reads its
+   * current value. Writing that expression once - rather than once for the
+   * initial call and again inside a matching notifier - is what keeps the two
+   * from drifting as subscriptions are added.
+   */
+  const feeds = [];
+  const feed = (read) => {
+    const listeners = new Map();
+    const entry = {
+      listeners,
+      notify: (id) => listenersFor(listeners, id).forEach((listener) => listener(read(id))),
+      subscribe: (id, onData) => {
+        const set = listenersFor(listeners, id);
+        set.add(onData);
+        onData(read(id));
+        return () => set.delete(onData);
+      },
+    };
+    feeds.push(entry);
+    return entry;
   };
+
+  const familyFeed = feed(familyOf);
+  const childrenFeed = feed((familyId) => [...(children.get(familyId) ?? [])]);
+  // Keyed by `${familyId}/${childId}`, like the ledgers.
+  const childFeed = feed((id) => childIn(...id.split('/')));
+  const ledgerFeed = feed((id) => newestFirst(ledgers.get(id) ?? []));
+  const inviteFeed = feed((email) => invites.get(email) ?? null);
+  const pendingFeed = feed((familyId) => byFamily(invites, familyId));
+  const deviceFeed = feed((uid) => devices.get(uid) ?? null);
+  const devicesFeed = feed((familyId) => byFamily(devices, familyId));
+  const pairingFeed = feed((familyId) => byFamily(pairings, familyId));
+
+  const notifyAuth = () => authListeners.forEach((listener) => listener(user));
+
+  // Renaming or removing a child changes both the family's list and whichever
+  // single-child views are open on it.
+  const notifyChildren = (familyId) => {
+    childrenFeed.notify(familyId);
+    [...childFeed.listeners.keys()]
+      .filter((id) => id.startsWith(`${familyId}/`))
+      .forEach(childFeed.notify);
+  };
+
+  const notifyLedger = (familyId, childId) => ledgerFeed.notify(key(familyId, childId));
+
+  // Ledger handles are cached so their identity is stable across renders; see
+  // the same cache in firestoreBackend for why that matters. Nothing is ever
+  // evicted: a handle holds two ids and no data, so it cannot go stale, and
+  // the map is bounded by the number of children a session has looked at.
+  const ledgerHandles = new Map();
 
   const applySeed = () => {
     families.set(MOCK_FAMILY_ID, {
@@ -130,6 +180,13 @@ export const createMockBackend = ({ seed = true } = {}) => {
       { id: MOCK_CHILD_ID, name: 'Sparrow' },
       { id: 'mock-child-2', name: 'Wren' },
     ]);
+    devices.set(MOCK_PAIRED_DEVICE_UID, {
+      id: MOCK_PAIRED_DEVICE_UID,
+      familyId: MOCK_FAMILY_ID,
+      childId: MOCK_CHILD_ID,
+      code: 'SEEDED',
+      pairedAt: daysAgo(30),
+    });
     ledgers.set(key(MOCK_FAMILY_ID, MOCK_CHILD_ID), seedTransactions());
     ledgers.set(key(MOCK_FAMILY_ID, 'mock-child-2'), [
       {
@@ -153,19 +210,59 @@ export const createMockBackend = ({ seed = true } = {}) => {
     children.clear();
     ledgers.clear();
     invites.clear();
+    devices.clear();
+    pairings.clear();
   };
 
   if (seed) applySeed();
 
-  const notifyEverything = () => {
-    [...familyListeners.keys()].forEach(notifyFamily);
-    [...childListeners.keys()].forEach(notifyChildren);
-    [...inviteListeners.keys()].forEach(notifyInvite);
-    [...pendingListeners.keys()].forEach(notifyPending);
-    [...ledgerListeners.keys()].forEach((id) => {
-      const [familyId, childId] = id.split('/');
-      notifyLedger(familyId, childId);
-    });
+  const notifyEverything = () =>
+    feeds.forEach((entry) => [...entry.listeners.keys()].forEach(entry.notify));
+
+  const makeLedger = (familyId, childId) => {
+    const id = key(familyId, childId);
+    return {
+      subscribeToTransactions(onData) {
+        return ledgerFeed.subscribe(id, onData);
+      },
+
+      addTransaction({ amountMinor, comment, category, user: author, userName }) {
+        ledgers.set(id, [
+          ...(ledgers.get(id) ?? []),
+          {
+            id: nextId('tx'),
+            amountMinor,
+            comment,
+            category,
+            user: author,
+            userName,
+            timestamp: new Date(),
+            editedBy: null,
+            editedByName: null,
+            editedAt: null,
+          },
+        ]);
+        notifyLedger(familyId, childId);
+        return Promise.resolve();
+      },
+
+      updateTransaction(transactionId, { amountMinor, comment, category, editedBy, editedByName }) {
+        ledgers.set(id, (ledgers.get(id) ?? []).map((transaction) =>
+          transaction.id === transactionId
+            // Spread first so author and timestamp survive the edit.
+            ? { ...transaction, amountMinor, comment, category, editedBy, editedByName, editedAt: new Date() }
+            : transaction
+        ));
+        notifyLedger(familyId, childId);
+        return Promise.resolve();
+      },
+
+      deleteTransaction(transactionId) {
+        ledgers.set(id, (ledgers.get(id) ?? []).filter((t) => t.id !== transactionId));
+        notifyLedger(familyId, childId);
+        return Promise.resolve();
+      },
+    };
   };
 
   return {
@@ -177,13 +274,19 @@ export const createMockBackend = ({ seed = true } = {}) => {
     },
 
     loginAs(role) {
-      user = role === 'child' ? MOCK_CHILD_USER : MOCK_PARENT;
+      if (role === 'child') user = childUser(MOCK_PAIRED_DEVICE_UID, 'child');
+      else if (role === 'child-unpaired') user = childUser(MOCK_UNPAIRED_DEVICE_UID, 'child-unpaired');
+      else user = MOCK_PARENT;
       notifyAuth();
       return Promise.resolve();
     },
 
     login() {
       return this.loginAs('parent');
+    },
+
+    startChildSession() {
+      return this.loginAs('child-unpaired');
     },
 
     logout() {
@@ -194,10 +297,7 @@ export const createMockBackend = ({ seed = true } = {}) => {
 
     // ---- family ----
     subscribeToFamily(uid, onData) {
-      const listeners = listenersFor(familyListeners, uid);
-      listeners.add(onData);
-      onData(familyOf(uid));
-      return () => listeners.delete(onData);
+      return familyFeed.subscribe(uid, onData);
     },
 
     createFamily({ uid, name }) {
@@ -205,16 +305,17 @@ export const createMockBackend = ({ seed = true } = {}) => {
       families.set(familyId, { id: familyId, name, createdBy: uid });
       memberships.set(uid, new Set([...(memberships.get(uid) ?? []), familyId]));
       children.set(familyId, []);
-      notifyFamily(uid);
+      familyFeed.notify(uid);
       return Promise.resolve(familyId);
     },
 
     // ---- children ----
     subscribeToChildren(familyId, onData) {
-      const listeners = listenersFor(childListeners, familyId);
-      listeners.add(onData);
-      onData([...(children.get(familyId) ?? [])]);
-      return () => listeners.delete(onData);
+      return childrenFeed.subscribe(familyId, onData);
+    },
+
+    subscribeToChild(familyId, childId, onData) {
+      return childFeed.subscribe(key(familyId, childId), onData);
     },
 
     addChild(familyId, { name }) {
@@ -235,34 +336,40 @@ export const createMockBackend = ({ seed = true } = {}) => {
 
     deleteChild(familyId, childId) {
       children.set(familyId, (children.get(familyId) ?? []).filter((c) => c.id !== childId));
-      // Nothing cascades in Firestore, so the ledger goes explicitly.
+      // Nothing cascades in Firestore, so the ledger, any paired devices and
+      // any unredeemed codes go explicitly - otherwise a device is left
+      // pointed at a missing child, or a code can still pair one to it.
       ledgers.delete(key(familyId, childId));
+      [...devices.values()]
+        .filter((device) => device.familyId === familyId && device.childId === childId)
+        .forEach((device) => {
+          devices.delete(device.id);
+          deviceFeed.notify(device.id);
+        });
+      [...pairings.values()]
+        .filter((pairing) => pairing.familyId === familyId && pairing.childId === childId)
+        .forEach((pairing) => pairings.delete(pairing.code));
       notifyChildren(familyId);
+      devicesFeed.notify(familyId);
+      pairingFeed.notify(familyId);
       notifyLedger(familyId, childId);
       return Promise.resolve();
     },
 
     // ---- inviting a second parent ----
     subscribeToInvite(email, onData) {
-      const address = normalizeEmail(email);
-      const listeners = listenersFor(inviteListeners, address);
-      listeners.add(onData);
-      onData(invites.get(address) ?? null);
-      return () => listeners.delete(onData);
+      return inviteFeed.subscribe(normalizeEmail(email), onData);
     },
 
     subscribeToPendingInvites(familyId, onData) {
-      const listeners = listenersFor(pendingListeners, familyId);
-      listeners.add(onData);
-      onData([...invites.values()].filter((invite) => invite.familyId === familyId));
-      return () => listeners.delete(onData);
+      return pendingFeed.subscribe(familyId, onData);
     },
 
     inviteParent(familyId, { email, invitedByName }) {
       const address = normalizeEmail(email);
       invites.set(address, { email: address, familyId, invitedByName });
-      notifyInvite(address);
-      notifyPending(familyId);
+      inviteFeed.notify(address);
+      pendingFeed.notify(familyId);
       return Promise.resolve();
     },
 
@@ -270,8 +377,8 @@ export const createMockBackend = ({ seed = true } = {}) => {
       const address = normalizeEmail(email);
       const invite = invites.get(address);
       invites.delete(address);
-      notifyInvite(address);
-      if (invite) notifyPending(invite.familyId);
+      inviteFeed.notify(address);
+      if (invite) pendingFeed.notify(invite.familyId);
       return Promise.resolve();
     },
 
@@ -279,9 +386,73 @@ export const createMockBackend = ({ seed = true } = {}) => {
       const address = normalizeEmail(email);
       memberships.set(uid, new Set([...(memberships.get(uid) ?? []), familyId]));
       invites.delete(address);
-      notifyFamily(uid);
-      notifyInvite(address);
-      notifyPending(familyId);
+      familyFeed.notify(uid);
+      inviteFeed.notify(address);
+      pendingFeed.notify(familyId);
+      return Promise.resolve();
+    },
+
+    // ---- pairing a child's device ----
+    subscribeToDevice(uid, onData) {
+      return deviceFeed.subscribe(uid, onData);
+    },
+
+    subscribeToDevices(familyId, onData) {
+      return devicesFeed.subscribe(familyId, onData);
+    },
+
+    subscribeToPairings(familyId, onData) {
+      return pairingFeed.subscribe(familyId, onData);
+    },
+
+    createPairingCode(familyId, childId) {
+      const code = generatePairingCode();
+      pairings.set(code, {
+        id: code,
+        code,
+        familyId,
+        childId,
+        expiresAt: pairingExpiry(),
+      });
+      pairingFeed.notify(familyId);
+      return Promise.resolve(code);
+    },
+
+    cancelPairingCode(rawCode) {
+      const code = normalizePairingCode(rawCode);
+      const pairing = pairings.get(code);
+      pairings.delete(code);
+      if (pairing) pairingFeed.notify(pairing.familyId);
+      return Promise.resolve();
+    },
+
+    redeemPairingCode(rawCode, uid) {
+      const code = normalizePairingCode(rawCode);
+      const pairing = pairings.get(code);
+      if (!pairing) return Promise.reject(pairingFailure(PAIRING_UNKNOWN));
+      if (pairing.expiresAt && pairing.expiresAt.getTime() <= Date.now()) {
+        return Promise.reject(pairingFailure(PAIRING_EXPIRED));
+      }
+
+      devices.set(uid, {
+        id: uid,
+        familyId: pairing.familyId,
+        childId: pairing.childId,
+        code,
+        pairedAt: new Date(),
+      });
+      pairings.delete(code);
+      deviceFeed.notify(uid);
+      devicesFeed.notify(pairing.familyId);
+      pairingFeed.notify(pairing.familyId);
+      return Promise.resolve();
+    },
+
+    unpairDevice(uid) {
+      const device = devices.get(uid);
+      devices.delete(uid);
+      deviceFeed.notify(uid);
+      if (device) devicesFeed.notify(device.familyId);
       return Promise.resolve();
     },
 
@@ -296,51 +467,8 @@ export const createMockBackend = ({ seed = true } = {}) => {
     // ---- one child's ledger; the shape components already consume ----
     ledgerFor(familyId, childId) {
       const id = key(familyId, childId);
-      return {
-        subscribeToTransactions(onData) {
-          const listeners = listenersFor(ledgerListeners, id);
-          listeners.add(onData);
-          onData(newestFirst(ledgers.get(id) ?? []));
-          return () => listeners.delete(onData);
-        },
-
-        addTransaction({ amountMinor, comment, category, user: author, userName }) {
-          ledgers.set(id, [
-            ...(ledgers.get(id) ?? []),
-            {
-              id: nextId('tx'),
-              amountMinor,
-              comment,
-              category,
-              user: author,
-              userName,
-              timestamp: new Date(),
-              editedBy: null,
-              editedByName: null,
-              editedAt: null,
-            },
-          ]);
-          notifyLedger(familyId, childId);
-          return Promise.resolve();
-        },
-
-        updateTransaction(transactionId, { amountMinor, comment, category, editedBy, editedByName }) {
-          ledgers.set(id, (ledgers.get(id) ?? []).map((transaction) =>
-            transaction.id === transactionId
-              // Spread first so author and timestamp survive the edit.
-              ? { ...transaction, amountMinor, comment, category, editedBy, editedByName, editedAt: new Date() }
-              : transaction
-          ));
-          notifyLedger(familyId, childId);
-          return Promise.resolve();
-        },
-
-        deleteTransaction(transactionId) {
-          ledgers.set(id, (ledgers.get(id) ?? []).filter((t) => t.id !== transactionId));
-          notifyLedger(familyId, childId);
-          return Promise.resolve();
-        },
-      };
+      if (!ledgerHandles.has(id)) ledgerHandles.set(id, makeLedger(familyId, childId));
+      return ledgerHandles.get(id);
     },
   };
 };

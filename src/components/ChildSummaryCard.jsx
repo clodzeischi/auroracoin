@@ -12,7 +12,9 @@ import { formatMinor } from '../utils/money.js';
  * delete controls, and buttons cannot nest. The child's name is the control
  * that opens the account, so a keyboard still reaches it.
  */
-export const ChildSummaryCard = ({ child, ledger, now, onOpen, onRename, onDelete }) => {
+export const ChildSummaryCard = ({
+    child, ledger, now, deviceCount = 0, onOpen, onRename, onPair, onDelete,
+}) => {
     const { transactions, loading, error } = useTransactions(ledger);
     const summary = useMemo(() => childSummary(transactions, now), [transactions, now]);
 
@@ -62,6 +64,20 @@ export const ChildSummaryCard = ({ child, ledger, now, onOpen, onRename, onDelet
                     onClick={stop(onRename)}
                 >
                     Rename
+                </button>
+                <button
+                    type="button"
+                    className="link-btn"
+                    aria-label={
+                        deviceCount > 0
+                            ? `Manage devices for ${child.name}`
+                            : `Pair a device for ${child.name}`
+                    }
+                    onClick={stop(onPair)}
+                >
+                    {deviceCount > 0
+                        ? `Device${deviceCount > 1 ? 's' : ''} (${deviceCount})`
+                        : 'Pair device'}
                 </button>
                 <button
                     type="button"

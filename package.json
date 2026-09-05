@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify:build": "node scripts/verify-build.mjs",
-    "verify": "yarn lint && yarn test && yarn build && yarn verify:build"
+    "verify": "yarn lint && yarn test && yarn test:rules && yarn build && yarn verify:build",
+    "test:rules": "firebase emulators:exec --only firestore --project auroracoin-rules-test \"vitest run --config vitest.rules.config.js\""
   },
   "dependencies": {
     "firebase": "^12.4.0",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

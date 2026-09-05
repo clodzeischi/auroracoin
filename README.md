@@ -1,16 +1,57 @@
-# React + Vite
+# AuroraCoin
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An allowance tracker shaped like a bank account you actually hold. You record
+what your child earns and spends; they get a real balance, a history they can
+look through, and a feel for how a balance sheet works. The money stays in your
+pocket - when they want something, you pay and withdraw it from their account.
 
-Currently, two official plugins are available:
+## Running it
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+yarn
+yarn dev
+```
 
-## React Compiler
+That's it. The dev server runs against in-memory mock data by default, so it
+needs no `.env`, no Firebase project and no network. A banner across the top
+makes the mock obvious and switches between the parent and child views.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+To run against real Firestore, copy `.env.example` to `.env`, fill it in with
 
-## Expanding the ESLint configuration
+```bash
+firebase apps:sdkconfig web <APP_ID>
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+and set `VITE_USE_MOCK_DATA=false`. A production build always uses real
+Firestore regardless of the flag.
+
+## How it works
+
+Parents sign in with Google and can invite a second parent by email. A child's
+device signs in anonymously and is paired by typing a short code the parent
+reads out; from then on it sees exactly one child's ledger, read-only.
+
+Money is stored as an integer number of hundredths, never a float, so a balance
+cannot drift a penny out. Access is enforced by `firestore.rules`, which is
+tested against the Firestore emulator rather than assumed.
+
+## Commands
+
+| | |
+|---|---|
+| `yarn dev` | dev server, mock data |
+| `yarn test` | unit and component tests |
+| `yarn test:rules` | security rules, against the emulator (needs Java) |
+| `yarn build` | production bundle |
+| `yarn verify` | everything above, plus a check that no mock data reached the bundle |
+
+`yarn verify` is the gate before deploying.
+
+## Deploying
+
+```bash
+yarn verify
+npx firebase deploy
+```
+
+Hosting serves `dist`; `firestore.rules` deploys with it.

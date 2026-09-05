@@ -1,19 +1,20 @@
 export const PARENT = 'parent';
 export const CHILD = 'child';
 
-const KNOWN = [PARENT, CHILD];
-
 /**
  * Which persona a session gets.
  *
- * Today this is derived from the session itself: a paired child device signs
- * in anonymously, a parent signs in with Google. When families land, the
- * authoritative answer moves to families/{fid}/members/{uid}.role - which is
- * why an explicit role on the user object already wins here.
+ * Derived from the session itself: a child's device signs in anonymously, a
+ * parent signs in with Google. Anonymity is the entire signal, and it is the
+ * same one the security rules key on - a child session has no email, so it can
+ * satisfy no rule that writes to a ledger. Client and server therefore agree
+ * by construction rather than by convention.
+ *
+ * What a child session may then *see* is a separate question, and is not
+ * answered here: that comes from its devices/{uid} record.
  */
 export function roleFor(user) {
   if (!user) return null;
-  if (KNOWN.includes(user.role)) return user.role;
   return user.isAnonymous ? CHILD : PARENT;
 }
 

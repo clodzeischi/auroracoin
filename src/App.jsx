@@ -5,21 +5,31 @@ import { Onboarding } from "./components/Onboarding.jsx";
 import { FamilyDashboard } from "./components/FamilyDashboard.jsx";
 import { AcceptInvite } from "./components/AcceptInvite.jsx";
 import { ChildLedger } from "./components/ChildLedger.jsx";
+import { ChildApp } from "./components/ChildApp.jsx";
 import { MockDataBanner } from "./components/MockDataBanner.jsx";
 import { useAuth } from "./hooks/useAuth.js";
 import { useFamily } from "./hooks/useFamily.js";
 import { useInvite } from "./hooks/useInvite.js";
 import { usePendingInvites } from "./hooks/usePendingInvites.js";
+import { useDevices } from "./hooks/useDevices.js";
+import { usePairings } from "./hooks/usePairings.js";
 import { getBackend } from "./data/index.js";
 import { isChild } from "./data/roles.js";
 
 export const App = () => {
     const backend = useMemo(() => getBackend(), []);
     const { user, loading: authLoading, login, logout } = useAuth(backend);
-    const { family, children, loading: familyLoading } = useFamily(backend, user);
+
+    // A child device is anonymous and belongs to no family in its own right,
+    // so it must not open the parent-side subscriptions at all.
+    const childSession = isChild(user);
+    const { family, children, loading: familyLoading } = useFamily(backend, childSession ? null : user);
 
     const invite = useInvite(backend, user?.email ?? null);
     const pendingInvites = usePendingInvites(backend, family?.id ?? null);
+
+    const devices = useDevices(backend, family?.id ?? null);
+    const pairings = usePairings(backend, family?.id ?? null);
 
     const [selectedChildId, setSelectedChildId] = useState(null);
     const [addingChild, setAddingChild] = useState(false);
@@ -50,20 +60,22 @@ export const App = () => {
     );
 
     if (authLoading) return shell(<p className="state">Loading…</p>);
-    if (!user) return shell(<Intro onSignIn={login} />);
 
-    // A paired child device knows exactly one ledger and never leaves it.
-    if (isChild(user)) {
-        if (!user.familyId || !user.childId) {
-            return shell(<p className="state">This device isn't paired yet.</p>);
-        }
+    if (!user) {
         return shell(
-            <ChildLedger
-                child={{ name: user.displayName ?? 'Your' }}
-                ledger={backend.ledgerFor(user.familyId, user.childId)}
-                user={user}
+            <Intro
+                onSignIn={login}
+                // Reading a pairing code requires being signed in, so setting up
+                // a child's device starts with an anonymous session and only
+                // then asks for the code.
+                onPairDevice={() => backend.startChildSession()}
             />
         );
+    }
+
+    // A child's device knows exactly one ledger and never leaves it.
+    if (childSession) {
+        return shell(<ChildApp backend={backend} user={user} onExit={logout} />);
     }
 
     if (familyLoading) return shell(<p className="state">Loading…</p>);
@@ -138,6 +150,11 @@ export const App = () => {
                 })
             }
             onCancelInvite={(email) => backend.cancelInvite(email)}
+            devices={devices}
+            pairings={pairings}
+            onCreatePairingCode={(childId) => backend.createPairingCode(family.id, childId)}
+            onCancelPairingCode={(code) => backend.cancelPairingCode(code)}
+            onUnpairDevice={(uid) => backend.unpairDevice(uid)}
         />
     );
 }

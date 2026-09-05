@@ -29,6 +29,9 @@ const setup = (children = CHILDREN, overrides = {}) => {
     onDeleteChild: vi.fn(() => Promise.resolve()),
     onInvite: vi.fn(() => Promise.resolve()),
     onCancelInvite: vi.fn(() => Promise.resolve()),
+    onCreatePairingCode: vi.fn(() => Promise.resolve('ABC234')),
+    onCancelPairingCode: vi.fn(() => Promise.resolve()),
+    onUnpairDevice: vi.fn(() => Promise.resolve()),
     ...overrides,
   };
   render(
@@ -239,5 +242,135 @@ describe('FamilyDashboard', () => {
 
       expect(onCancelInvite).toHaveBeenCalledWith('deeanna@example.com');
     });
+  });
+});
+
+const device = (id, childId) => ({ id, childId, familyId: FAMILY.id, pairedAt: NOW });
+
+describe('pairing a child device', () => {
+  it('offers pairing on a child that has no device yet', () => {
+    setup();
+    expect(screen.getByRole('button', { name: /pair a device for sparrow/i })).toBeInTheDocument();
+  });
+
+  it('shows how many devices a child already has', () => {
+    setup(CHILDREN, { devices: [device('d1', 'c1'), device('d2', 'c1')] });
+
+    const card = screen.getByLabelText("Sparrow's account");
+    expect(within(card).getByRole('button', { name: /manage devices for sparrow/i }))
+      .toHaveTextContent('Devices (2)');
+  });
+
+  it('counts only the devices belonging to that child', () => {
+    setup(CHILDREN, { devices: [device('d1', 'c1')] });
+
+    const wren = screen.getByLabelText("Wren's account");
+    expect(within(wren).getByRole('button', { name: /pair a device for wren/i })).toBeInTheDocument();
+  });
+
+  /**
+   * The code is made on open rather than behind a further click: a parent who
+   * reached this dialog has already said what they want, and a code that only
+   * lives ten minutes should not start its clock before they can read it.
+   */
+  it('makes a code as soon as the dialog opens', async () => {
+    const { onCreatePairingCode, user } = setup();
+    await user.click(screen.getByRole('button', { name: /pair a device for sparrow/i }));
+
+    expect(onCreatePairingCode).toHaveBeenCalledWith('c1');
+    expect(await screen.findByText('ABC234')).toBeInTheDocument();
+  });
+
+  it('reads the code out in single characters for a screen reader', async () => {
+    const { user } = setup();
+    await user.click(screen.getByRole('button', { name: /pair a device for sparrow/i }));
+
+    expect(await screen.findByLabelText('Pairing code A B C 2 3 4')).toBeInTheDocument();
+  });
+
+  it('says which child the code is for', async () => {
+    const { user } = setup();
+    await user.click(screen.getByRole('button', { name: /pair a device for sparrow/i }));
+
+    expect(await screen.findByRole('heading', { name: /pair a device for sparrow/i }))
+      .toBeInTheDocument();
+  });
+
+  it('surfaces a failure instead of showing an empty code', async () => {
+    const { user } = setup(CHILDREN, {
+      onCreatePairingCode: vi.fn(() => Promise.reject(new Error('offline'))),
+    });
+    await user.click(screen.getByRole('button', { name: /pair a device for sparrow/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not make a code/i);
+  });
+
+  it('lets a parent revoke a device from the same place they add one', async () => {
+    const { onUnpairDevice, user } = setup(CHILDREN, { devices: [device('d1', 'c1')] });
+    await user.click(screen.getByRole('button', { name: /manage devices for sparrow/i }));
+    await user.click(await screen.findByRole('button', { name: /unpair this device from sparrow/i }));
+
+    expect(onUnpairDevice).toHaveBeenCalledWith('d1');
+  });
+
+  const liveCode = (code, childId = 'c1') => ({
+    id: code, code, childId, expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+  });
+
+  /**
+   * The same control opens this dialog to pair a device and to revoke one, so
+   * minting on every open would leave a live code behind each time a parent
+   * came here to take access away.
+   */
+  it('reuses a code the child already has rather than minting another', async () => {
+    const { onCreatePairingCode, user } = setup(CHILDREN, { pairings: [liveCode('OLD123')] });
+    await user.click(screen.getByRole('button', { name: /pair a device for sparrow/i }));
+
+    expect(await screen.findByText('OLD123')).toBeInTheDocument();
+    expect(onCreatePairingCode).not.toHaveBeenCalled();
+  });
+
+  it('mints a fresh one when the only code has expired', async () => {
+    const { onCreatePairingCode, user } = setup(CHILDREN, {
+      pairings: [{ id: 'DEAD01', code: 'DEAD01', childId: 'c1', expiresAt: new Date(Date.now() - 1000) }],
+    });
+    await user.click(screen.getByRole('button', { name: /pair a device for sparrow/i }));
+
+    expect(await screen.findByText('ABC234')).toBeInTheDocument();
+    expect(onCreatePairingCode).toHaveBeenCalledWith('c1');
+  });
+
+  it('ignores a code belonging to a different child', async () => {
+    const { onCreatePairingCode, user } = setup(CHILDREN, { pairings: [liveCode('OTHER1', 'c2')] });
+    await user.click(screen.getByRole('button', { name: /pair a device for sparrow/i }));
+
+    await screen.findByText('ABC234');
+    expect(onCreatePairingCode).toHaveBeenCalledWith('c1');
+  });
+
+  it('lets a parent cancel a spare code they read out and thought better of', async () => {
+    const { onCancelPairingCode, user } = setup(CHILDREN, {
+      pairings: [liveCode('SHOWN1'), liveCode('SPARE1')],
+    });
+    await user.click(screen.getByRole('button', { name: /pair a device for sparrow/i }));
+    await user.click(await screen.findByRole('button', { name: /cancel code SPARE1/i }));
+
+    expect(onCancelPairingCode).toHaveBeenCalledWith('SPARE1');
+  });
+
+  it('closes without pairing anything', async () => {
+    const { user } = setup();
+    await user.click(screen.getByRole('button', { name: /pair a device for sparrow/i }));
+    await screen.findByText('ABC234');
+    await user.click(screen.getByRole('button', { name: /^done$/i }));
+
+    expect(screen.queryByText('ABC234')).not.toBeInTheDocument();
+  });
+
+  it('does not open a child account when the pair control is used', async () => {
+    const { onOpenChild, user } = setup();
+    await user.click(screen.getByRole('button', { name: /pair a device for sparrow/i }));
+
+    expect(onOpenChild).not.toHaveBeenCalled();
   });
 });

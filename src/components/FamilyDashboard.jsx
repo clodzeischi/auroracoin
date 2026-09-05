@@ -3,14 +3,21 @@ import { ChildSummaryCard } from './ChildSummaryCard.jsx';
 import { ConfirmDialog } from './ConfirmDialog.jsx';
 import { PromptDialog } from './PromptDialog.jsx';
 import { InviteParent } from './InviteParent.jsx';
+import { PairDeviceDialog } from './PairDeviceDialog.jsx';
 
 export const FamilyDashboard = ({
     family, children, ledgerFor, now,
     onOpenChild, onAddChild, onRenameChild, onDeleteChild,
     pendingInvites, onInvite, onCancelInvite,
+    devices = [], pairings = [], onCreatePairingCode, onCancelPairingCode, onUnpairDevice,
 }) => {
     const [renaming, setRenaming] = useState(null);
     const [deleting, setDeleting] = useState(null);
+    // Just the child: whether a code is needed, and what went wrong getting
+    // one, are the dialog's business rather than the dashboard's.
+    const [pairing, setPairing] = useState(null);
+
+    const devicesForChild = (childId) => devices.filter((device) => device.childId === childId);
 
     const confirmDelete = async () => {
         const target = deleting;
@@ -39,8 +46,10 @@ export const FamilyDashboard = ({
                             child={child}
                             ledger={ledgerFor(child.id)}
                             now={now}
+                            deviceCount={devicesForChild(child.id).length}
                             onOpen={() => onOpenChild(child.id)}
                             onRename={() => setRenaming(child)}
+                            onPair={() => setPairing(child)}
                             onDelete={() => setDeleting(child)}
                         />
                     ))}
@@ -70,6 +79,18 @@ export const FamilyDashboard = ({
                 }}
                 onCancel={() => setRenaming(null)}
             />
+
+            {pairing && (
+                <PairDeviceDialog
+                    child={pairing}
+                    devices={devicesForChild(pairing.id)}
+                    pairings={pairings.filter((code) => code.childId === pairing.id)}
+                    onCreateCode={() => onCreatePairingCode(pairing.id)}
+                    onCancelCode={onCancelPairingCode}
+                    onUnpair={onUnpairDevice}
+                    onClose={() => setPairing(null)}
+                />
+            )}
 
             <ConfirmDialog
                 isOpen={Boolean(deleting)}

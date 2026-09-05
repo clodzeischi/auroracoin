@@ -1,17 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useLiveList } from './useLive.js';
 
 /** Invitations this family has outstanding. */
-export const usePendingInvites = (backend, familyId) => {
-  const [pending, setPending] = useState([]);
-
-  useEffect(() => {
-    if (!familyId) {
-      setPending([]);
-      return undefined;
-    }
-    const unsubscribe = backend.subscribeToPendingInvites(familyId, setPending, () => setPending([]));
-    return () => unsubscribe();
-  }, [backend, familyId]);
-
-  return pending;
-};
+export const usePendingInvites = (backend, familyId) =>
+  useLiveList(backend, 'subscribeToPendingInvites', familyId);

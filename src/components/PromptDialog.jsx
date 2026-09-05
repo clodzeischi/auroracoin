@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Modal } from './Modal.jsx';
 
 /** A one-field modal, for renaming things. */
 export const PromptDialog = ({
@@ -10,16 +11,11 @@ export const PromptDialog = ({
     const inputRef = useRef(null);
 
     useEffect(() => {
-        if (!isOpen) return undefined;
+        if (!isOpen) return;
         setValue(initialValue);
         setError(null);
         inputRef.current?.focus();
-        const onKeyDown = (event) => {
-            if (event.key === 'Escape') onCancel();
-        };
-        document.addEventListener('keydown', onKeyDown);
-        return () => document.removeEventListener('keydown', onKeyDown);
-    }, [isOpen, initialValue, onCancel]);
+    }, [isOpen, initialValue]);
 
     if (!isOpen) return null;
 
@@ -33,37 +29,29 @@ export const PromptDialog = ({
     };
 
     return (
-        <div className="overlay" onMouseDown={onCancel}>
-            <div
-                className="modal modal-sm"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="prompt-title"
-                onMouseDown={(e) => e.stopPropagation()}
-            >
-                <div className="modal-head">
-                    <h2 className="modal-title" id="prompt-title">{title}</h2>
-                    <button className="modal-close" onClick={onCancel} aria-label="Close">×</button>
-                </div>
-                <div className="modal-body">
-                    <div className="field">
-                        <label htmlFor="prompt-input">{label}</label>
-                        <input
-                            ref={inputRef}
-                            id="prompt-input"
-                            value={value}
-                            maxLength={maxLength}
-                            onChange={(e) => setValue(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
-                        />
-                    </div>
-                    {error && <div role="alert" className="alert">{error}</div>}
-                </div>
-                <div className="modal-foot">
+        <Modal
+            title={title}
+            titleId="prompt-title"
+            onClose={onCancel}
+            foot={
+                <>
                     <button className="btn btn-quiet" onClick={onCancel}>Cancel</button>
                     <button className="btn btn-primary" onClick={submit}>{confirmLabel}</button>
-                </div>
+                </>
+            }
+        >
+            <div className="field">
+                <label htmlFor="prompt-input">{label}</label>
+                <input
+                    ref={inputRef}
+                    id="prompt-input"
+                    value={value}
+                    maxLength={maxLength}
+                    onChange={(e) => setValue(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+                />
             </div>
-        </div>
+            {error && <div role="alert" className="alert">{error}</div>}
+        </Modal>
     );
 };

@@ -32,6 +32,7 @@
 
   --ui: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
   --display: "Fraunces", Georgia, "Times New Roman", serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -622,6 +623,10 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   border-radius: 999px;
 }
 .onboarding-actions { display: flex; gap: 9px; margin-top: 20px; }
+/* A setup screen's lede paragraph and its error both sit in the column's
+   rhythm, so no screen has to invent its own margins for them. */
+.onboarding .state { margin-bottom: 20px; }
+.onboarding .alert { margin-top: 14px; }
 
 /* ---------------- family dashboard ---------------- */
 .family-head { padding: 34px 0 22px; }
@@ -735,6 +740,16 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 }
 .link-btn:hover { color: var(--ink); text-decoration: underline; }
 .link-btn.is-danger:hover { color: var(--danger); }
+/* A link-shaped button sitting inside a sentence rather than in a row of
+   controls: it has to match the prose around it and carry its own underline,
+   or it reads as nothing more than bold text. */
+.link-inline {
+  font-size: inherit;
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.link-inline:hover { color: var(--ink); }
 
 /* ---------------- invites ---------------- */
 .invite-row {
@@ -743,6 +758,11 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   gap: 10px;
   flex-wrap: wrap;
 }
+/* The address field takes the room left over; min-width lets it shrink
+   rather than pushing the button off the row on a narrow screen. */
+.invite-row .field { flex: 1; min-width: 0; }
+.invite-lede { margin-bottom: 14px; }
+.invite-feedback { margin-top: 12px; }
 .pending-list {
   list-style: none;
   margin: 16px 0 0;
@@ -760,3 +780,53 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   font-size: 13.5px;
   color: var(--ink-2);
 }
+
+/* ============================================================
+   Pairing a child's device
+   The code is read aloud across a room, so it is set large,
+   monospaced and widely tracked - grouping matters more here
+   than elegance.
+   ============================================================ */
+.code-display {
+  margin: 4px 0 6px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: .22em;
+  /* The tracking is applied to the right of each glyph, including the last,
+     which would otherwise sit visibly off-centre. */
+  text-indent: .22em;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 16px 10px;
+}
+
+.code-expiry { text-align: center; }
+
+.code-inline {
+  font-family: var(--mono);
+  letter-spacing: .12em;
+  color: var(--ink);
+}
+
+.code-input {
+  font-family: var(--mono);
+  font-size: 24px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.pair-steps {
+  margin: 16px 0 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.pair-steps strong { color: var(--ink); font-weight: 600; }

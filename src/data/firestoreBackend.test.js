@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Every Firebase surface is mocked: these tests assert the adapter's contract
 // (paths, query shape, document mapping) without a network or an SDK.
@@ -14,11 +14,20 @@ vi.mock('firebase/firestore', () => ({
   deleteDoc: vi.fn(() => Promise.resolve()),
   where: vi.fn((field, op, value) => ({ __where: `${field} ${op} ${value}` })),
   serverTimestamp: vi.fn(() => '__SERVER_TIMESTAMP__'),
+  getDoc: vi.fn(() => Promise.resolve({ exists: () => false })),
+  getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
+  arrayUnion: vi.fn((...values) => ({ __arrayUnion: values })),
+  writeBatch: vi.fn(() => ({
+    set: vi.fn(), update: vi.fn(), delete: vi.fn(),
+    commit: vi.fn(() => Promise.resolve()),
+  })),
+  Timestamp: { fromDate: vi.fn((date) => ({ __timestamp: date.getTime() })) },
 }));
 
 vi.mock('firebase/auth', () => ({
   onAuthStateChanged: vi.fn(() => vi.fn()),
   signInWithPopup: vi.fn(() => Promise.resolve()),
+  signInAnonymously: vi.fn(() => Promise.resolve()),
   signOut: vi.fn(() => Promise.resolve()),
 }));
 
@@ -31,9 +40,11 @@ vi.mock('./firebaseApp.js', () => ({
 import {
   collection, doc, orderBy, onSnapshot, addDoc,
   updateDoc, deleteDoc, setDoc, where, serverTimestamp,
+  getDoc, getDocs, writeBatch, Timestamp,
 } from 'firebase/firestore';
-import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signInAnonymously, signOut } from 'firebase/auth';
 import { createFirestoreBackend } from './firestoreBackend.js';
+import { PAIRING_EXPIRED, PAIRING_TTL_MINUTES, PAIRING_UNKNOWN } from './pairing.js';
 
 const FAMILY = 'fam1';
 const CHILD = 'kid1';
@@ -259,5 +270,213 @@ describe('auth', () => {
     expect(onAuthStateChanged).toHaveBeenCalled();
     expect(signInWithPopup).toHaveBeenCalled();
     expect(signOut).toHaveBeenCalled();
+  });
+});
+
+describe('ledger handle caching', () => {
+  /**
+   * Components subscribe in an effect keyed on the ledger's identity. A fresh
+   * object per call meant every render of an ancestor - opening a dialog, a
+   * pending-invite snapshot arriving - tore down and re-established one
+   * Firestore listener per child, re-reading the collection each time.
+   */
+  it('returns the same handle for the same child', () => {
+    const backend = createFirestoreBackend();
+    expect(backend.ledgerFor(FAMILY, CHILD)).toBe(backend.ledgerFor(FAMILY, CHILD));
+  });
+
+  it('keeps different children on different handles', () => {
+    const backend = createFirestoreBackend();
+    expect(backend.ledgerFor(FAMILY, 'kid1')).not.toBe(backend.ledgerFor(FAMILY, 'kid2'));
+  });
+
+  it('does not share handles between families that reuse a child id', () => {
+    const backend = createFirestoreBackend();
+    expect(backend.ledgerFor('famA', CHILD)).not.toBe(backend.ledgerFor('famB', CHILD));
+  });
+});
+
+describe('finding the family', () => {
+  const familyDoc = (id) => ({ id, data: () => ({ name: id }) });
+
+  it('picks the same family every load when a parent is in more than one', () => {
+    const backend = createFirestoreBackend();
+    const onData = vi.fn();
+    backend.subscribeToFamily('uid1', onData, vi.fn());
+    const emit = onSnapshot.mock.calls[0][1];
+
+    // Snapshot order is not guaranteed, so the same set arriving in a
+    // different order must still resolve to the same household.
+    emit(snapshotOf([familyDoc('zeta'), familyDoc('alpha')]));
+    emit(snapshotOf([familyDoc('alpha'), familyDoc('zeta')]));
+
+    expect(onData.mock.calls.map(([family]) => family.id)).toEqual(['alpha', 'alpha']);
+  });
+
+  it('reports no family rather than undefined when there are none', () => {
+    const backend = createFirestoreBackend();
+    const onData = vi.fn();
+    backend.subscribeToFamily('uid1', onData, vi.fn());
+    onSnapshot.mock.calls[0][1](snapshotOf([]));
+
+    expect(onData).toHaveBeenCalledWith(null);
+  });
+});
+
+describe('pairing a child device', () => {
+  it('signs a child device in anonymously, so it never carries an email', async () => {
+    await createFirestoreBackend().startChildSession();
+    expect(signInAnonymously).toHaveBeenCalled();
+  });
+
+  it('writes the code as the document id, so a collision is refused not merged', async () => {
+    const backend = createFirestoreBackend();
+    const code = await backend.createPairingCode(FAMILY, CHILD);
+
+    expect(doc).toHaveBeenCalledWith(expect.anything(), 'pairings', code);
+    expect(setDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ familyId: FAMILY, childId: CHILD, createdAt: '__SERVER_TIMESTAMP__' })
+    );
+  });
+
+  it('stamps the code with the advertised expiry', async () => {
+    // Bracketed by both clock readings: the expiry is measured from whenever
+    // inside the call the code was made, so the only sound assertion is that
+    // it lands TTL ahead of some instant during it.
+    const before = Date.now();
+    await createFirestoreBackend().createPairingCode(FAMILY, CHILD);
+    const after = Date.now();
+
+    const ttl = PAIRING_TTL_MINUTES * 60 * 1000;
+    const [expiry] = Timestamp.fromDate.mock.calls[0];
+    expect(expiry.getTime()).toBeGreaterThanOrEqual(before + ttl);
+    expect(expiry.getTime()).toBeLessThanOrEqual(after + ttl);
+  });
+
+  it('tells a child a code is unknown rather than failing opaquely', async () => {
+    getDoc.mockResolvedValueOnce({ exists: () => false });
+    await expect(createFirestoreBackend().redeemPairingCode('ABC234', 'device-1'))
+      .rejects.toMatchObject({ reason: PAIRING_UNKNOWN });
+  });
+
+  it('tells a child a code has expired, which reads differently from a wrong one', async () => {
+    getDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({
+        familyId: FAMILY,
+        childId: CHILD,
+        expiresAt: { toMillis: () => Date.now() - 1000 },
+      }),
+    });
+    await expect(createFirestoreBackend().redeemPairingCode('ABC234', 'device-1'))
+      .rejects.toMatchObject({ reason: PAIRING_EXPIRED });
+  });
+
+  it('claims the device and destroys the code in one batch, so a code is single use', async () => {
+    getDoc.mockResolvedValueOnce({
+      exists: () => true,
+      data: () => ({
+        familyId: FAMILY,
+        childId: CHILD,
+        expiresAt: { toMillis: () => Date.now() + 60000 },
+      }),
+    });
+
+    await createFirestoreBackend().redeemPairingCode('abc-234', 'device-1');
+
+    const batch = writeBatch.mock.results[0].value;
+    expect(batch.set).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        familyId: FAMILY,
+        childId: CHILD,
+        // Normalized on the way in, so what the child typed matches the id
+        // the rules will look the pairing up under.
+        code: 'ABC234',
+        pairedAt: '__SERVER_TIMESTAMP__',
+      })
+    );
+    expect(batch.delete).toHaveBeenCalled();
+    expect(batch.commit).toHaveBeenCalled();
+  });
+
+  it('reads a device document as null when the device has never paired', () => {
+    const onData = vi.fn();
+    createFirestoreBackend().subscribeToDevice('device-1', onData, vi.fn());
+    onSnapshot.mock.calls[0][1]({ exists: () => false });
+
+    expect(onData).toHaveBeenCalledWith(null);
+  });
+
+  it('scopes the device list to one family', () => {
+    createFirestoreBackend().subscribeToDevices(FAMILY, vi.fn(), vi.fn());
+    expect(where).toHaveBeenCalledWith('familyId', '==', FAMILY);
+  });
+});
+
+describe('deleting a child', () => {
+  // These tests drive getDocs per case; put the shared default back afterwards
+  // so nothing leaks into a later file.
+  afterEach(() => getDocs.mockImplementation(() => Promise.resolve({ docs: [] })));
+
+  const ref = (path) => ({ __ref: path });
+  const docsOf = (...paths) => ({ docs: paths.map((path) => ({ ref: ref(path) })) });
+
+  /**
+   * Firestore cascades nothing, so everything that points at a child has to be
+   * removed by hand: its ledger, the devices paired to it, and any code that
+   * could still pair a new one.
+   */
+  it('removes the ledger, the devices and the unredeemed codes together', async () => {
+    getDocs
+      .mockResolvedValueOnce(docsOf('tx-1', 'tx-2'))
+      .mockResolvedValueOnce(docsOf('device-1'))
+      .mockResolvedValueOnce(docsOf('pairing-1'));
+
+    await createFirestoreBackend().deleteChild(FAMILY, CHILD);
+
+    const batch = writeBatch.mock.results[0].value;
+    const deleted = batch.delete.mock.calls.map(([target]) => target);
+    expect(deleted).toEqual(expect.arrayContaining([
+      ref('tx-1'), ref('tx-2'), ref('device-1'), ref('pairing-1'),
+    ]));
+    expect(batch.commit).toHaveBeenCalled();
+  });
+
+  it('deletes the child document last, so nothing is orphaned by a failure', async () => {
+    getDocs
+      .mockResolvedValueOnce(docsOf('tx-1'))
+      .mockResolvedValueOnce(docsOf())
+      .mockResolvedValueOnce(docsOf());
+
+    await createFirestoreBackend().deleteChild(FAMILY, CHILD);
+
+    const batch = writeBatch.mock.results[0].value;
+    const last = batch.delete.mock.calls.at(-1)[0];
+    expect(last).toEqual(expect.objectContaining({ __doc: `families/${FAMILY}/children/${CHILD}` }));
+  });
+
+  it('asks only for the devices and codes of the child being deleted', async () => {
+    getDocs.mockResolvedValue(docsOf());
+
+    await createFirestoreBackend().deleteChild(FAMILY, CHILD);
+
+    expect(where).toHaveBeenCalledWith('childId', '==', CHILD);
+  });
+
+  it('issues its three reads together rather than one round trip each', async () => {
+    let settled = 0;
+    getDocs.mockImplementation(() => {
+      // Resolves only once all three have been requested, so a sequential
+      // implementation would deadlock this test rather than pass it slowly.
+      settled += 1;
+      return settled === 3 ? Promise.resolve(docsOf()) : new Promise((resolve) => {
+        setTimeout(() => resolve(docsOf()), 0);
+      });
+    });
+
+    await createFirestoreBackend().deleteChild(FAMILY, CHILD);
+    expect(settled).toBe(3);
   });
 });
