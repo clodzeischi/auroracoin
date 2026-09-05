@@ -1,17 +1,23 @@
-import { useEffect, useState } from 'react';
-import { auth, provider } from '../firebase';
-import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { useCallback, useEffect, useState } from 'react';
+import { getBackend } from '../data/index.js';
 
-export const useAuth = () => {
-    const [user, setUser] = useState(null);
+/**
+ * `backend` is injectable so tests can drive auth transitions directly.
+ */
+export const useAuth = (backend = getBackend()) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, setUser);
-        return () => unsubscribe();
-    }, []);
+  useEffect(() => {
+    const unsubscribe = backend.subscribeToAuth((nextUser) => {
+      setUser(nextUser ?? null);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, [backend]);
 
-    const login = () => signInWithPopup(auth, provider);
-    const logout = () => signOut(auth);
+  const login = useCallback(() => backend.login(), [backend]);
+  const logout = useCallback(() => backend.logout(), [backend]);
 
-    return { user, login, logout };
-}
+  return { user, loading, login, logout };
+};

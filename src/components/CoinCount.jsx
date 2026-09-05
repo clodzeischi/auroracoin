@@ -1,25 +1,20 @@
-import { useEffect, useState } from 'react';
-import { db } from '../firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { useTransactions } from '../hooks/useTransactions.js';
+import { formatMinor } from '../utils/money.js';
 
-export const CoinCount = () => {
-    const [totalCoins, setTotalCoins] = useState(0);
-
-    useEffect( () => {
-        const unsubscribe = onSnapshot(collection(db, 'transactions'), snapshot => {
-            let total = 0;
-            snapshot.forEach(doc => {
-                total += doc.data().amount;
-            });
-            setTotalCoins(total);
-        });
-
-        return () => unsubscribe(); // cleanup on unmount
-    }, []);
+export const CoinCount = ({ ledger, label = 'Total balance' }) => {
+    const { totalMinor, loading, error } = useTransactions(ledger);
 
     return (
-        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', padding: '1rem' }}>
-            Total Coins: {totalCoins}
-        </div>
+        <section className="balance" aria-label={label}>
+            <p className="balance-label">{label}</p>
+            {error ? (
+                <p className="balance-error">Couldn't load the balance.</p>
+            ) : (
+                <p className="balance-value">
+                    {loading ? '—' : formatMinor(totalMinor)}
+                    <span className="balance-unit">coins</span>
+                </p>
+            )}
+        </section>
     );
 }

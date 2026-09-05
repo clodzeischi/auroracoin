@@ -1,11 +1,53 @@
-export const TableRow = ( {data} ) => {
+export const TableRow = ({ data, onEdit, onDelete, readOnly = false }) => {
+
+    const tone = data.amountMinor >= 0 ? 'earned' : 'spent';
+    const display = data.display;
+
+    if (readOnly) {
+        // The child's ledger: what happened, not who changed it.
+        return (
+            <tr>
+                <td className={`cell-amount amount-plain is-${tone}`}>{display}</td>
+                <td><span className={`chip is-${tone}`}>{data.category}</span></td>
+                <td className="cell-time">{data.time}</td>
+                <td className="cell-comment">{data.comment}</td>
+            </tr>
+        );
+    }
+
+    const describe = `${display} coins, ${data.category}`;
 
     return (
-        <tr>
-            <th scope="row">{data.amount}</th>
-            <td>{data.time}</td>
-            <td className="d-none d-md-table-cell">{data.user}</td>
-            <td>{data.comment}</td>
+        <tr className="ledger-row" onClick={onEdit}>
+            <td className="cell-amount">
+                {/* The amount itself is the control, so "click the deposit"
+                    also works from a keyboard and reads correctly aloud. */}
+                <button
+                    type="button"
+                    className={`amount-btn is-${tone}`}
+                    aria-label={`Edit transaction: ${describe}`}
+                    onClick={onEdit}
+                >
+                    {display}
+                </button>
+            </td>
+            <td><span className={`chip is-${tone}`}>{data.category}</span></td>
+            <td className="cell-time">{data.time}</td>
+            <td className="cell-user hide-sm">{data.user}</td>
+            <td className="cell-comment">
+                {data.comment}
+                {data.editedNote && <span className="edited-note">{data.editedNote}</span>}
+            </td>
+            <td className="cell-actions">
+                <button
+                    type="button"
+                    className="row-delete"
+                    aria-label={`Delete transaction: ${describe}`}
+                    onClick={(event) => { event.stopPropagation(); onDelete(); }}
+                >
+                    ×
+                </button>
+            </td>
         </tr>
     )
 }

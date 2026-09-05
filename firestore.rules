@@ -1,0 +1,295 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function verifiedEmail() {
+      return signedIn() && request.auth.token.get('email_verified', false) == true;
+    }
+
+    // Membership is an array on the family document rather than a
+    // subcollection. Rules evaluate a batched write against the state before
+    // the batch, so a separate membership document written alongside a new
+    // family could not verify the family it belonged to - which would have
+    // meant letting anyone add themselves as a parent of any family.
+    function familyData(fid) {
+      return get(/databases/$(database)/documents/families/$(fid)).data;
+    }
+
+    function isParentOf(fid) {
+      return signedIn() && request.auth.uid in familyData(fid).parentUids;
+    }
+
+    /**
+     * A paired child device is anonymous, so it has no email and no stable
+     * identity a parent could name in advance. What it has is a document at
+     * devices/{uid} naming the one child it may see. That document is the
+     * device's entire authority; it is written once, at pairing, and is never
+     * updatable afterwards.
+     */
+    function deviceRef() {
+      return /databases/$(database)/documents/devices/$(request.auth.uid);
+    }
+
+    function hasDevice() {
+      return signedIn() && exists(deviceRef());
+    }
+
+    function deviceData() {
+      return get(deviceRef()).data;
+    }
+
+    /**
+     * A device's authority does not outlive the child it names. deleteChild is
+     * several separate commits on the client, so an interrupted delete would
+     * otherwise leave a device still able to read the family it was paired
+     * into - and the invariant "only a live child can be seen" belongs here,
+     * not in cleanup code that a closed tab can skip.
+     */
+    function devicePointsAtLiveChild() {
+      return hasDevice()
+        && exists(/databases/$(database)/documents/families/$(deviceData().familyId)/children/$(deviceData().childId));
+    }
+
+    function isDeviceIn(fid) {
+      return devicePointsAtLiveChild() && deviceData().familyId == fid;
+    }
+
+    function isDeviceOf(fid, cid) {
+      return isDeviceIn(fid) && deviceData().childId == cid;
+    }
+
+    function canViewChild(fid, cid) {
+      return isParentOf(fid) || isDeviceOf(fid, cid);
+    }
+
+    function inviteFor(email) {
+      return get(/databases/$(database)/documents/invites/$(email)).data;
+    }
+
+    function hasInviteTo(fid) {
+      return verifiedEmail()
+        && exists(/databases/$(database)/documents/invites/$(request.auth.token.email))
+        && inviteFor(request.auth.token.email).familyId == fid;
+    }
+
+    /**
+     * An invitee is not yet a parent, so they cannot pass isParentOf. This
+     * lets them add themselves - and only themselves - to a family they hold
+     * an invite for, changing nothing else about it.
+     */
+    function isAcceptingInvite(fid) {
+      return hasInviteTo(fid)
+        && request.resource.data.parentUids.toSet()
+             == resource.data.parentUids.toSet().union([request.auth.uid].toSet())
+        && request.resource.data.parents.diff(resource.data.parents).affectedKeys()
+             == [request.auth.uid].toSet()
+        && request.resource.data.name == resource.data.name
+        && request.resource.data.createdBy == resource.data.createdBy;
+    }
+
+    function isValidName(value, maxLength) {
+      return value is string && value.size() > 0 && value.size() <= maxLength;
+    }
+
+    // Keep this list in sync with src/data/categories.js. A unit test asserts
+    // that every id defined there also appears in this file.
+    function isValidCategory(category) {
+      return category in [
+        'chores', 'allowance', 'gift', 'bonus', 'school',
+        'toys', 'games', 'books', 'treats', 'outings', 'savings', 'giving',
+        'uncategorized'
+      ];
+    }
+
+    // Fields every transaction carries, whether new or edited. amountMinor is
+    // an integer number of hundredths, never a float: money summed as floats
+    // drifts, and a decimal check in rules is unreliable because 10.07 * 100
+    // is 1006.9999999999999.
+    function hasValidCore(d) {
+      return d.amountMinor is int
+        && d.amountMinor != 0
+        && math.abs(d.amountMinor) <= 100000000
+        && isValidCategory(d.category)
+        && d.comment is string
+        && d.comment.size() <= 500
+        // Display names are cosmetic and not pinned to the token: within a
+        // family the same people can already write any amount they like.
+        && (d.userName == null || (d.userName is string && d.userName.size() <= 100));
+    }
+
+    // A new transaction: authored by the caller, stamped by the server.
+    function isValidCreate() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['amountMinor', 'comment', 'category', 'user', 'userName', 'timestamp'])
+        && d.keys().hasAll(['amountMinor', 'comment', 'category', 'user', 'userName', 'timestamp'])
+        && hasValidCore(d)
+        && d.user == request.auth.token.email
+        && d.timestamp == request.time;
+    }
+
+    // An edit may change what was recorded, never who recorded it or when.
+    // Rewriting timestamp here would silently move the entry's date, so both
+    // it and the original author are pinned to their existing values.
+    function isValidUpdate() {
+      let d = request.resource.data;
+      let prior = resource.data;
+      return d.keys().hasOnly(['amountMinor', 'comment', 'category', 'user', 'userName', 'timestamp', 'editedBy', 'editedByName', 'editedAt'])
+        && d.keys().hasAll(['amountMinor', 'comment', 'category', 'user', 'userName', 'timestamp', 'editedBy', 'editedByName', 'editedAt'])
+        && hasValidCore(d)
+        && d.user == prior.user
+        && d.timestamp == prior.timestamp
+        && d.editedBy == request.auth.token.email
+        && (d.editedByName == null || (d.editedByName is string && d.editedByName.size() <= 100))
+        && d.editedAt == request.time;
+    }
+
+    match /families/{fid} {
+      allow read: if signedIn()
+        && (request.auth.uid in resource.data.parentUids || isDeviceIn(fid));
+
+      // A new family names its creator as its only parent. Without this a
+      // founder could seed a family that already contains someone else.
+      allow create: if verifiedEmail()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.parentUids == [request.auth.uid]
+        && isValidName(request.resource.data.name, 60);
+
+      // An existing parent may rename the family or invite another parent.
+      // Parents are add-only: a co-parent cannot be dropped from the family
+      // by the other one, and nobody can remove themselves and strand the
+      // household with no administrator. Removing a parent is deliberately
+      // not possible from the client at all.
+      allow update: if (isParentOf(fid)
+          && request.resource.data.parentUids.toSet().hasAll(resource.data.parentUids)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && isValidName(request.resource.data.name, 60))
+        || isAcceptingInvite(fid);
+
+      allow delete: if false;
+
+      match /children/{cid} {
+        allow read: if canViewChild(fid, cid);
+        allow create, update: if isParentOf(fid) && isValidName(request.resource.data.name, 40);
+        allow delete: if isParentOf(fid);
+
+        match /transactions/{transactionId} {
+          allow read: if canViewChild(fid, cid);
+          allow create: if isParentOf(fid) && isValidCreate();
+          allow update: if isParentOf(fid) && isValidUpdate();
+          allow delete: if isParentOf(fid);
+        }
+      }
+    }
+
+    /**
+     * Invites are keyed by the invited email address, because a uid cannot be
+     * known before that person has ever signed in.
+     */
+    match /invites/{email} {
+      // The invitee reads their own invite; a parent of the family sees the
+      // ones they have outstanding.
+      allow read: if signedIn()
+        && (request.auth.token.get('email', '') == email
+            || request.auth.uid in familyData(resource.data.familyId).parentUids);
+
+      allow create: if verifiedEmail()
+        && request.auth.uid in familyData(request.resource.data.familyId).parentUids
+        && request.resource.data.email == email
+        && email.matches('^[^@]+@[^@]+[.][^@]+$');
+
+      // Cancelled by a parent, or consumed by the person it was addressed to.
+      allow delete: if signedIn()
+        && (request.auth.token.get('email', '') == email
+            || request.auth.uid in familyData(resource.data.familyId).parentUids);
+
+      allow update: if false;
+    }
+
+    /**
+     * A pairing code is a short-lived ticket a parent creates for one child,
+     * read out loud, and typed into the child's device. It is the child-device
+     * counterpart of an invite: the same problem (naming someone who has no
+     * identity yet) with the same shape of answer.
+     *
+     * The code IS the secret, so a document may be fetched by id by anyone
+     * signed in - but the collection is not listable except by a parent of the
+     * family, which keeps codes from being enumerated.
+     */
+    match /pairings/{code} {
+      allow get: if signedIn();
+      allow list: if isParentOf(resource.data.familyId);
+
+      allow create: if verifiedEmail()
+        && isParentOf(request.resource.data.familyId)
+        && request.resource.data.keys().hasOnly(['familyId', 'childId', 'createdAt', 'expiresAt'])
+        && request.resource.data.keys().hasAll(['familyId', 'childId', 'createdAt', 'expiresAt'])
+        && request.resource.data.childId is string
+        && exists(/databases/$(database)/documents/families/$(request.resource.data.familyId)/children/$(request.resource.data.childId))
+        && request.resource.data.createdAt == request.time
+        // Bounded lifetime, enforced here rather than trusted from the client:
+        // a code that never expires is a permanent key to a child's ledger.
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt < request.time + duration.value(24, 'h');
+
+      allow update: if false;
+
+      // Consumed by the device redeeming it, or cancelled by a parent.
+      //
+      // Any signed-in caller presenting the code may delete it. This cannot
+      // be narrowed to "the device that just paired": rules evaluate a
+      // batched write against the state from BEFORE the batch, so when this
+      // delete is checked the device document being created alongside it does
+      // not exist yet, and isDeviceOf is necessarily false. Splitting the two
+      // writes would leave a code redeemable after it had been used, which is
+      // the worse failure - so the delete is widened instead. Knowing a code
+      // already permits redeeming it; being able to destroy it grants no
+      // access that redeeming would not.
+      allow delete: if signedIn();
+    }
+
+    /**
+     * One document per paired child device, keyed by the anonymous uid. This
+     * is what a device is allowed to see, and it is written exactly once: the
+     * device claims a code, and from then on the document is immutable. An
+     * update rule would be a way to repoint a device at a sibling's ledger.
+     */
+    match /devices/{uid} {
+      allow get: if signedIn()
+        && (request.auth.uid == uid || isParentOf(resource.data.familyId));
+      allow list: if isParentOf(resource.data.familyId);
+
+      // Redeeming a code. The device may only name itself, and may only
+      // record the family and child that the code it presents actually
+      // points at. The pairing is still readable here even when the delete
+      // that consumes it rides in the same batch, because rules see the
+      // state from before the batch.
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['familyId', 'childId', 'code', 'pairedAt'])
+        && request.resource.data.keys().hasAll(['familyId', 'childId', 'code', 'pairedAt'])
+        && request.resource.data.code is string
+        && request.resource.data.pairedAt == request.time
+        && exists(/databases/$(database)/documents/pairings/$(request.resource.data.code))
+        && pairingFor(request.resource.data.code).familyId == request.resource.data.familyId
+        && pairingFor(request.resource.data.code).childId == request.resource.data.childId
+        && request.time < pairingFor(request.resource.data.code).expiresAt;
+
+      allow update: if false;
+
+      // Unpaired by a parent, or by the device retiring itself.
+      allow delete: if request.auth.uid == uid || isParentOf(resource.data.familyId);
+    }
+
+    function pairingFor(code) {
+      return get(/databases/$(database)/documents/pairings/$(code)).data;
+    }
+
+    // Everything outside a family is denied by default.
+  }
+}

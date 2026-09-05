@@ -1,29 +1,27 @@
-import {Button, Navbar, NavbarBrand} from "reactstrap";
-import {useState} from "react";
-import {CoinForm} from "./CoinForm.jsx";
+import {isChild} from "../data/roles.js";
 
-export const Header = ({user, login, logout}) => {
+export const Header = ({user, loading, login, logout}) => {
 
-    const [modalOpen, setModalOpen] = useState(false);
+    const child = isChild(user);
 
     return (
-        <>
-            <Navbar color="light">
-                <NavbarBrand href="/">
-                    <img className='mx-2' alt="logo" src="/favicon.ico" style={{height: 40, width: 40}}/>
-                    AuroraCoin
-                </NavbarBrand>
-                { user ? (
-                    <>
-                        <Button color='primary' onClick={() => {setModalOpen(true)}}>Add item</Button>
-                        <Button color='secondary' onClick={logout}>Logout</Button>
-                    </>
-
+        <header className="header">
+            <a className="brand" href="/">
+                <img alt="" src="/favicon.ico" />
+                <span>AuroraCoin</span>
+            </a>
+            <div className="header-actions">
+                {/* A child gets no auth controls. Her session is anonymous:
+                    signing out would destroy the device pairing for good, and
+                    signing in would replace it. Neither is offered. While auth
+                    is still resolving, render nothing rather than flashing a
+                    sign-in button at someone already signed in. */}
+                {loading || child ? null : user ? (
+                    <button className="btn btn-quiet" onClick={logout}>Sign out</button>
                 ) : (
-                    <Button color='secondary' onClick={login}>Login with Google</Button>
+                    <button className="btn btn-quiet" onClick={login}>Sign in with Google</button>
                 )}
-            </Navbar>
-            <CoinForm isOpen={modalOpen} toggle={ () => {setModalOpen(!modalOpen)}} user={user} />
-        </>
+            </div>
+        </header>
     )
 }
