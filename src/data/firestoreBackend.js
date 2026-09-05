@@ -20,6 +20,12 @@ import { onAuthStateChanged, signInWithPopup, signInAnonymously, signOut } from 
 import { getDb, getAuthInstance, getProvider } from './firebaseApp.js';
 import { UNCATEGORIZED } from './categories.js';
 import {
+  CHILD_SESSIONS_DISABLED,
+  SESSION_CANCELLED,
+  SESSION_UNAVAILABLE,
+  sessionFailure,
+} from './session.js';
+import {
   generatePairingCode,
   normalizePairingCode,
   pairingExpiry,
@@ -58,6 +64,28 @@ const toTransaction = (snapshot) => {
 };
 
 const normalizeEmail = (email) => String(email ?? '').trim().toLowerCase();
+
+/**
+ * Firebase's auth codes, mapped once so nothing above this layer sees one.
+ *
+ * admin-restricted-operation is what anonymous sign-in returns when the
+ * provider is switched off for the project - a deployment that has not been
+ * finished rather than anything the person holding the device did wrong, and
+ * worth telling apart from a network blip for exactly that reason.
+ */
+const sessionReason = (code) => {
+  if (code === 'auth/admin-restricted-operation' || code === 'auth/operation-not-allowed') {
+    return CHILD_SESSIONS_DISABLED;
+  }
+  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+    return SESSION_CANCELLED;
+  }
+  return SESSION_UNAVAILABLE;
+};
+
+const asSessionFailure = (failure) => {
+  throw sessionFailure(sessionReason(failure?.code));
+};
 
 // Every subscription here hands components one of two shapes: a single document
 // that may not exist, or a list. Keeping both in one place means the document
@@ -138,7 +166,7 @@ export const createFirestoreBackend = () => {
     },
 
     login() {
-      return signInWithPopup(getAuthInstance(), getProvider());
+      return signInWithPopup(getAuthInstance(), getProvider()).catch(asSessionFailure);
     },
 
     /**
@@ -147,7 +175,7 @@ export const createFirestoreBackend = () => {
      * what stops it satisfying any rule that writes to a ledger.
      */
     startChildSession() {
-      return signInAnonymously(getAuthInstance());
+      return signInAnonymously(getAuthInstance()).catch(asSessionFailure);
     },
 
     logout() {

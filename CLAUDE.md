@@ -46,6 +46,16 @@ client stops a hand-rolled SDK call, so every access decision lives in the rules
 and is tested against a real emulator in `rules-tests/`. A change to who can see
 or write what is a rules change first and a UI change second.
 
+## Deployment prerequisites
+
+Firebase Authentication must have **both** Google and Anonymous providers
+enabled. Anonymous is what a child's device signs in with; with it switched off,
+`signInAnonymously` fails with `auth/admin-restricted-operation` and the whole
+child persona is unreachable. The data layer maps that code to
+`CHILD_SESSIONS_DISABLED` (see `src/data/session.js`) so the UI can say which of
+"misconfigured" and "offline" it is - the two look identical otherwise, and the
+failure was previously silent.
+
 ## Data model
 
 ```

@@ -45,6 +45,9 @@ import {
 import { onAuthStateChanged, signInWithPopup, signInAnonymously, signOut } from 'firebase/auth';
 import { createFirestoreBackend } from './firestoreBackend.js';
 import { PAIRING_EXPIRED, PAIRING_TTL_MINUTES, PAIRING_UNKNOWN } from './pairing.js';
+import {
+  CHILD_SESSIONS_DISABLED, SESSION_CANCELLED, SESSION_UNAVAILABLE,
+} from './session.js';
 
 const FAMILY = 'fam1';
 const CHILD = 'kid1';
@@ -478,5 +481,48 @@ describe('deleting a child', () => {
 
     await createFirestoreBackend().deleteChild(FAMILY, CHILD);
     expect(settled).toBe(3);
+  });
+});
+
+describe('starting a session', () => {
+  /**
+   * Anonymous sign-in returns admin-restricted-operation when the provider is
+   * switched off for the project. That is a deployment that was never
+   * finished, not a flaky network, and the UI says something different for
+   * each - so the distinction has to survive the trip up from the SDK.
+   */
+  it('recognises a child-device provider that is switched off', async () => {
+    signInAnonymously.mockRejectedValueOnce({ code: 'auth/admin-restricted-operation' });
+
+    await expect(createFirestoreBackend().startChildSession())
+      .rejects.toMatchObject({ reason: CHILD_SESSIONS_DISABLED });
+  });
+
+  it('treats an unconfigured provider the same way', async () => {
+    signInAnonymously.mockRejectedValueOnce({ code: 'auth/operation-not-allowed' });
+
+    await expect(createFirestoreBackend().startChildSession())
+      .rejects.toMatchObject({ reason: CHILD_SESSIONS_DISABLED });
+  });
+
+  it('reports anything else as simply unavailable', async () => {
+    signInAnonymously.mockRejectedValueOnce({ code: 'auth/network-request-failed' });
+
+    await expect(createFirestoreBackend().startChildSession())
+      .rejects.toMatchObject({ reason: SESSION_UNAVAILABLE });
+  });
+
+  it('marks a closed sign-in popup as cancelled, not failed', async () => {
+    signInWithPopup.mockRejectedValueOnce({ code: 'auth/popup-closed-by-user' });
+
+    await expect(createFirestoreBackend().login())
+      .rejects.toMatchObject({ reason: SESSION_CANCELLED });
+  });
+
+  it('never lets a raw Firebase code escape the data layer', async () => {
+    signInAnonymously.mockRejectedValueOnce({ code: 'auth/admin-restricted-operation' });
+
+    const failure = await createFirestoreBackend().startChildSession().catch((error) => error);
+    expect(failure.code).toBeUndefined();
   });
 });

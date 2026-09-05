@@ -571,6 +571,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 .intro-actions { margin-top: 30px; }
 .btn-lg { font-size: 15px; padding: 11px 22px; }
 .intro-note { font-size: 13px; color: var(--ink-3); margin: 10px 0 0; }
+.intro-alert { margin-top: 18px; }
 .intro-pair {
   margin-top: 38px;
   padding-top: 18px;
