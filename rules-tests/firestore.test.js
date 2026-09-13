@@ -2,7 +2,7 @@ import { beforeAll, afterAll, beforeEach, describe, it } from 'vitest';
 import { assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import {
   addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, setDoc,
-  serverTimestamp, Timestamp, updateDoc, where, writeBatch, arrayUnion,
+  serverTimestamp, Timestamp, updateDoc, where, orderBy, writeBatch, arrayUnion,
 } from 'firebase/firestore';
 import {
   createTestEnv, seed, pairDevice, seedPairing, minutesFromNow,
@@ -287,6 +287,12 @@ describe('children', () => {
   it('refuses a stranger reading a child', async () => {
     await assertFails(
       getDoc(doc(asParent(env, STRANGER_UID, STRANGER_EMAIL), 'families', FAMILY, 'children', CHILD))
+    );
+  });
+
+  it('lets a parent list their children, ordered - what subscribeToChildren does', async () => {
+    await assertSucceeds(
+      getDocs(query(collection(asParent(env), 'families', FAMILY, 'children'), orderBy('createdAt', 'asc')))
     );
   });
 });
