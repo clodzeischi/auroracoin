@@ -13,9 +13,12 @@ import { useEffect } from 'react';
  * `dismissible` is the one real difference between them: a dialog you can walk
  * away from carries a close button in its head, while an alertdialog puts its
  * title in the body and makes you answer the question.
+ *
+ * `small` narrows the card further, for the one- and few-field dialogs. A form
+ * with several fields side by side (CoinForm) opts out and takes the base width.
  */
 export const Modal = ({
-    title, titleId, role = 'dialog', dismissible = true, onClose, foot, children,
+    title, titleId, role = 'dialog', dismissible = true, small = true, onClose, foot, children,
 }) => {
     useEffect(() => {
         const onKeyDown = (event) => {
@@ -28,7 +31,7 @@ export const Modal = ({
     return (
         <div className="overlay" onMouseDown={onClose}>
             <div
-                className="modal modal-sm"
+                className={`modal${small ? ' modal-sm' : ''}`}
                 role={role}
                 aria-modal="true"
                 aria-labelledby={titleId}

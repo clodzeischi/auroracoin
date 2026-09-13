@@ -70,34 +70,30 @@ describe('CoinForm', () => {
     expect(backend.addTransaction).not.toHaveBeenCalled();
   });
 
-  it('offers earning categories when coins are being added', async () => {
-    const { user } = setup();
-
-    await user.type(amountField(), '10');
+  it('offers earning categories by default', () => {
+    setup();
 
     expect(optionLabels()).toContain('Chores');
     expect(optionLabels()).not.toContain('Toys');
   });
 
-  it('offers spending categories when coins are being taken away', async () => {
+  it('offers spending categories once "Spent" is chosen', async () => {
     const { user } = setup();
 
-    await user.type(amountField(), '-10');
+    await user.click(screen.getByRole('button', { name: 'Spent' }));
 
     expect(optionLabels()).toContain('Toys');
     expect(optionLabels()).not.toContain('Chores');
   });
 
-  it('clears a chosen category when the amount flips direction', async () => {
+  it('clears a chosen category when the direction changes', async () => {
     // Otherwise "Chores" could be submitted against a spend.
     const { user } = setup();
 
-    await user.type(amountField(), '10');
     await user.selectOptions(categoryField(), 'chores');
     expect(categoryField()).toHaveValue('chores');
 
-    await user.clear(amountField());
-    await user.type(amountField(), '-10');
+    await user.click(screen.getByRole('button', { name: 'Spent' }));
 
     expect(categoryField()).toHaveValue('');
   });
@@ -107,8 +103,8 @@ describe('CoinForm', () => {
     // must survive that, or editing an amount silently drops it.
     const { user } = setup();
 
-    await user.type(amountField(), '10');
     await user.selectOptions(categoryField(), 'chores');
+    await user.type(amountField(), '10');
     await user.clear(amountField());
     await user.type(amountField(), '15');
 
@@ -125,10 +121,13 @@ describe('CoinForm', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/category/i);
   });
 
-  it('accepts a negative amount, so coins can be spent', async () => {
+  it('stores a spend as a negative amount, without needing a typed minus sign', async () => {
+    // iOS Safari's numeric keypad has no minus key, so direction is a button,
+    // not a character the amount field has to accept.
     const { backend, user } = setup();
 
-    await user.type(amountField(), '-4.25');
+    await user.click(screen.getByRole('button', { name: 'Spent' }));
+    await user.type(amountField(), '4.25');
     await user.selectOptions(categoryField(), 'toys');
     await user.click(submit());
 
@@ -219,6 +218,22 @@ describe('CoinForm', () => {
     setup();
 
     expect(amountField()).toHaveFocus();
+  });
+
+  it('prefills a spend for editing as a plain magnitude, with "Spent" already chosen', async () => {
+    const { backend, user } = setup({
+      transaction: { id: 'tx-1', amountMinor: -425, category: 'toys', comment: 'stickers' },
+    });
+
+    expect(amountField()).toHaveValue(4.25);
+    expect(screen.getByRole('button', { name: 'Spent' })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(backend.updateTransaction).toHaveBeenCalledWith(
+      'tx-1',
+      expect.objectContaining({ amountMinor: -425 })
+    );
   });
 
   it('refuses to write when nobody is signed in', async () => {

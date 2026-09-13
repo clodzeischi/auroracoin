@@ -34,7 +34,7 @@ export const ChildSummaryCard = ({
                 >
                     {child.name}
                 </button>
-                <span className="child-balance">
+                <span className={`child-balance${loading ? '' : summary.balanceMinor < 0 ? ' is-spent' : ' is-earned'}`}>
                     {loading ? '—' : formatMinor(summary.balanceMinor)}
                 </span>
             </div>

@@ -1,4 +1,5 @@
 import {useEffect, useRef, useState} from "react";
+import {Modal} from "./Modal.jsx";
 import {categoriesForAmount} from "../data/categories.js";
 import {parseAmountInput, formatMinor} from "../utils/money.js";
 
@@ -9,39 +10,41 @@ const parseAmount = parseAmountInput;
 export const CoinForm = ({ isOpen, toggle, user, backend, transaction = null }) => {
 
     const isEditing = Boolean(transaction);
-    const [amount, setAmount] = useState(isEditing ? formatMinor(transaction.amountMinor) : '');
+    // Direction is chosen explicitly rather than read off a typed minus sign:
+    // iOS Safari's numeric keypad has no minus key, so the amount field below
+    // only ever holds a magnitude - see handleSubmit for where the sign is
+    // put back on.
+    const [direction, setDirection] = useState(
+        isEditing && transaction.amountMinor < 0 ? 'spent' : 'earned'
+    );
+    const [amount, setAmount] = useState(isEditing ? formatMinor(Math.abs(transaction.amountMinor)) : '');
     const [category, setCategory] = useState(transaction?.category ?? '');
     const [comment, setComment] = useState(transaction?.comment ?? '');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const amountRef = useRef(null);
 
-    // Escape closes, and the first field takes focus on open - both of which
-    // the component library used to provide.
+    // Escape and click-away are Modal's job; the amount field taking focus on
+    // open is this form's own, since Modal makes no assumption about which
+    // field that should be.
     useEffect(() => {
         if (!isOpen) return undefined;
         amountRef.current?.focus();
-        const onKeyDown = (event) => {
-            if (event.key === 'Escape') toggle();
-        };
-        document.addEventListener('keydown', onKeyDown);
-        return () => document.removeEventListener('keydown', onKeyDown);
-    }, [isOpen, toggle]);
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
-    const parsedAmount = parseAmount(amount);
-    const categoryOptions = categoriesForAmount(parsedAmount);
+    const signOf = (dir) => (dir === 'spent' ? -1 : 1);
+    const magnitude = parseAmount(amount);
+    const parsedAmount = magnitude === null ? null : Math.abs(magnitude) * signOf(direction);
+    const categoryOptions = categoriesForAmount(signOf(direction));
 
-    const handleAmountChange = (nextAmount) => {
-        setAmount(nextAmount);
+    const chooseDirection = (nextDirection) => {
+        setDirection(nextDirection);
         // Earning and spending have disjoint category sets, so a category
-        // chosen before the sign flipped is no longer a legal choice. Only
-        // act once the new amount is usable: while the field is empty or
-        // half-typed there are no options at all, and clearing then would
-        // wipe the category every time someone retypes an amount.
-        const nextOptions = categoriesForAmount(parseAmount(nextAmount));
-        if (nextOptions.length > 0 && !nextOptions.some((option) => option.id === category)) {
+        // chosen under the old direction is no longer a legal choice.
+        const nextOptions = categoriesForAmount(signOf(nextDirection));
+        if (!nextOptions.some((option) => option.id === category)) {
             setCategory('');
         }
     };
@@ -96,77 +99,86 @@ export const CoinForm = ({ isOpen, toggle, user, backend, transaction = null }) 
     }
 
     return (
-        <div className="overlay" onMouseDown={toggle}>
-            <div
-                className="modal"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="coin-form-title"
-                onMouseDown={(e) => e.stopPropagation()}
-            >
-                <div className="modal-head">
-                    <h2 className="modal-title" id="coin-form-title">
-                        {isEditing ? 'Edit transaction' : 'Add transaction'}
-                    </h2>
-                    <button className="modal-close" onClick={toggle} aria-label="Close">×</button>
-                </div>
-
-                <div className="modal-body">
-                    <div className="field">
-                        <label htmlFor="amount">Amount</label>
-                        <input
-                            ref={amountRef}
-                            type="number"
-                            inputMode="decimal"
-                            step="0.01"
-                            id="amount"
-                            value={amount}
-                            onChange={e => handleAmountChange(e.target.value)}
-                        />
-                        <span className="field-hint">
-                            Positive to give coins, negative to spend them.
-                        </span>
-                    </div>
-
-                    <div className="field">
-                        <label htmlFor="category">Category</label>
-                        <select
-                            id="category"
-                            value={category}
-                            disabled={categoryOptions.length === 0}
-                            onChange={e => setCategory(e.target.value)}
-                        >
-                            <option value="">
-                                {categoryOptions.length === 0
-                                    ? 'Enter an amount first'
-                                    : 'Choose a category'}
-                            </option>
-                            {categoryOptions.map((option) => (
-                                <option key={option.id} value={option.id}>{option.label}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="field">
-                        <label htmlFor="comment">Comment</label>
-                        <input
-                            type="text"
-                            id="comment"
-                            value={comment}
-                            onChange={e => setComment(e.target.value)}
-                        />
-                    </div>
-
-                    {error && <div role="alert" className="alert">{error}</div>}
-                </div>
-
-                <div className="modal-foot">
+        <Modal
+            title={isEditing ? 'Edit transaction' : 'Add transaction'}
+            titleId="coin-form-title"
+            small={false}
+            onClose={toggle}
+            foot={
+                <>
                     <button className="btn btn-quiet" onClick={toggle}>Cancel</button>
                     <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
                         {loading ? 'Saving…' : isEditing ? 'Save' : 'Submit'}
                     </button>
+                </>
+            }
+        >
+            <div className="field">
+                <span className="field-label">Type</span>
+                {/* Two buttons rather than a typed sign, so this works the same
+                    whether or not the device's keyboard offers a minus key. */}
+                <div className="direction-toggle" role="group" aria-label="Type">
+                    <button
+                        type="button"
+                        className={`direction-btn is-earned${direction === 'earned' ? ' is-active' : ''}`}
+                        aria-pressed={direction === 'earned'}
+                        onClick={() => chooseDirection('earned')}
+                    >
+                        Earned
+                    </button>
+                    <button
+                        type="button"
+                        className={`direction-btn is-spent${direction === 'spent' ? ' is-active' : ''}`}
+                        aria-pressed={direction === 'spent'}
+                        onClick={() => chooseDirection('spent')}
+                    >
+                        Spent
+                    </button>
                 </div>
             </div>
-        </div>
+
+            <div className="field">
+                <label htmlFor="amount">Amount</label>
+                <input
+                    ref={amountRef}
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    id="amount"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                />
+                <span className="field-hint">
+                    {direction === 'earned' ? 'Added to the balance.' : 'Taken from the balance.'}
+                </span>
+            </div>
+
+            <div className="field">
+                <label htmlFor="category">Category</label>
+                <select
+                    id="category"
+                    value={category}
+                    onChange={e => setCategory(e.target.value)}
+                >
+                    <option value="">Choose a category</option>
+                    {categoryOptions.map((option) => (
+                        <option key={option.id} value={option.id}>{option.label}</option>
+                    ))}
+                </select>
+            </div>
+
+            <div className="field">
+                <label htmlFor="comment">Comment</label>
+                <input
+                    type="text"
+                    id="comment"
+                    value={comment}
+                    onChange={e => setComment(e.target.value)}
+                />
+            </div>
+
+            {error && <div role="alert" className="alert">{error}</div>}
+        </Modal>
     )
 }
