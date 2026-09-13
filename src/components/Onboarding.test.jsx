@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Onboarding } from './Onboarding.jsx';
 
@@ -25,11 +25,6 @@ describe('Onboarding', () => {
   it('asks for a family nickname first', () => {
     setup();
     expect(screen.getByLabelText(/family nickname/i)).toBeInTheDocument();
-  });
-
-  it('warns that anything typed here is hosted by Google', () => {
-    setup();
-    expect(screen.getByText(/google's data policies/i)).toBeInTheDocument();
   });
 
   it('will not create a family without a name', async () => {
@@ -62,11 +57,6 @@ describe('Onboarding', () => {
   it('moves to children once a family exists', () => {
     setup({ family: FAMILY });
     expect(screen.getByLabelText(/child's nickname/i)).toBeInTheDocument();
-  });
-
-  it('tells the parent plainly not to enter the child\'s real name', () => {
-    setup({ family: FAMILY });
-    expect(screen.getByText(/real name/i)).toBeInTheDocument();
   });
 
   it('adds a child and clears the field for the next one', async () => {
@@ -162,5 +152,36 @@ describe('leaving the add-children step', () => {
     const exits = screen.getAllByRole('button')
       .filter((button) => /^(done|back)$/i.test(button.textContent.trim()));
     expect(exits).toHaveLength(1);
+  });
+});
+
+describe("Aurora's guidance", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  // Comfortably longer than either line at 22ms/character.
+  const finishTyping = () => act(() => vi.advanceTimersByTime(5000));
+
+  it('carries the family-nickname instructions herself', () => {
+    render(
+      <Onboarding family={null} onCreateFamily={vi.fn()} onAddChild={vi.fn()} onLeave={vi.fn()} />
+    );
+    finishTyping();
+
+    expect(screen.getByText(/create a nickname for your family/i)).toBeInTheDocument();
+  });
+
+  it('switches to the nickname/privacy reminder once a family exists', () => {
+    render(
+      <Onboarding
+        family={{ id: 'fam1', name: 'The Aurora House' }}
+        onCreateFamily={vi.fn()}
+        onAddChild={vi.fn()}
+        onLeave={vi.fn()}
+      />
+    );
+    finishTyping();
+
+    expect(screen.getByText(/respect all children's privacy/i)).toBeInTheDocument();
   });
 });

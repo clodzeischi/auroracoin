@@ -1,82 +1,46 @@
 /* ============================================================
    AuroraCoin — design tokens
-   Two hues carry meaning throughout: green = coins in,
-   violet = coins out. Both pairs are validated for colour-vision
-   deficiency against their own surface (light and dark are
-   separately chosen, not flipped).
+   GBA-era JRPG palette: bright sky-blue field, warm cream panels,
+   thick friendly navy ink instead of black. Light mode only for
+   this pass - a pixel-art dark palette is its own design problem,
+   not a hue swap, so it is deferred rather than half-done here.
+   Two hues still carry meaning throughout: green = coins in,
+   violet = coins out.
    ============================================================ */
 :root {
-  --bg:         #F7F9F7;
-  --surface:    #FFFFFF;
-  --surface-2:  #EFF3F0;
-  --ink:        #0E1C17;
-  --ink-2:      #46564F;
-  --ink-3:      #76857D;
-  --line:       #E0E7E2;
-  --line-2:     #CBD6CF;
-  --earned:     #00915F;
-  --earned-bg:  #E4F2EC;
-  --spent:      #6B4BC4;
-  --spent-bg:   #EDE8F8;
-  --danger:     #B3261E;
-  --danger-bg:  #FBE9E7;
-  --warn:       #8A5A12;
-  --warn-bg:    #FBF0DC;
+  --bg:         #BEEBFF;
+  --surface:    #FFFDF6;
+  --surface-2:  #FFF3D6;
+  --ink:        #22314F;
+  --ink-2:      #48577C;
+  --ink-3:      #7C88A8;
+  --line:       #CFE8FB;
+  --line-2:     #9FD3F5;
+  --earned:     #22C55E;
+  --earned-bg:  #DDFCE7;
+  --spent:      #9B5DE5;
+  --spent-bg:   #F1E4FF;
+  --danger:     #EF4444;
+  --danger-bg:  #FFE1E1;
+  --warn:       #F5A524;
+  --warn-bg:    #FFF0C2;
 
-  --shadow-sm: 0 1px 2px rgba(14, 28, 23, .06);
-  --shadow-md: 0 4px 16px -4px rgba(14, 28, 23, .12);
-  --shadow-lg: 0 24px 60px -12px rgba(14, 28, 23, .28);
+  --shadow-sm: 0 1px 2px rgba(34, 49, 79, .10);
+  --shadow-md: 0 4px 16px -4px rgba(34, 49, 79, .16);
+  --shadow-lg: 0 24px 60px -12px rgba(34, 49, 79, .30);
 
   --radius:    14px;
   --radius-sm: 9px;
 
-  --ui: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --display: "Fraunces", Georgia, "Times New Roman", serif;
+  /* Press Start 2P is the display face - titles, balances, anywhere
+     text is big enough for true 8-bit blocks to read cleanly. Pixelify
+     Sans carries body copy and controls, where Press Start 2P's fixed
+     block width would make a ledger unreadable. --mono stays a plain
+     system stack: the pairing code needs unambiguous glyphs read aloud
+     across a room, not a pixel-art moment. */
+  --ui: "Pixelify Sans", "Press Start 2P", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: "Press Start 2P", "Pixelify Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg:         #0B1210;
-    --surface:    #121A17;
-    --surface-2:  #1A2420;
-    --ink:        #E8EFEA;
-    --ink-2:      #A9B8B1;
-    --ink-3:      #78877F;
-    --line:       #223029;
-    --line-2:     #2E3E36;
-    --earned:     #1AA475;
-    --earned-bg:  #102A21;
-    --spent:      #8B70DE;
-    --spent-bg:   #1E1B33;
-    --danger:     #F2B8B5;
-    --danger-bg:  #2C1614;
-    --warn:       #E8B563;
-    --warn-bg:    #2B2113;
-
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
-    --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, .5);
-    --shadow-lg: 0 24px 60px -12px rgba(0, 0, 0, .7);
-  }
-}
-
-:root[data-theme="dark"] {
-  --bg:         #0B1210;
-  --surface:    #121A17;
-  --surface-2:  #1A2420;
-  --ink:        #E8EFEA;
-  --ink-2:      #A9B8B1;
-  --ink-3:      #78877F;
-  --line:       #223029;
-  --line-2:     #2E3E36;
-  --earned:     #1AA475;
-  --earned-bg:  #102A21;
-  --spent:      #8B70DE;
-  --spent-bg:   #1E1B33;
-  --danger:     #F2B8B5;
-  --danger-bg:  #2C1614;
-  --warn:       #E8B563;
-  --warn-bg:    #2B2113;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -89,6 +53,11 @@ body {
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  /* Pixelify Sans's "fi" ligature glyph renders as something closer to "A"
+     at UI sizes - "financial" becomes "Anancial". Neither pixel face was
+     drawn with ligatures in mind, so turn them off everywhere rather than
+     patch copy around it. */
+  font-variant-ligatures: none;
 }
 
 :focus-visible {
@@ -153,49 +122,69 @@ body {
   position: sticky;
   top: 0;
   z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
   padding: 14px 0;
   margin-bottom: 8px;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
 }
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.header .alert { margin-top: 10px; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
-.brand img { width: 30px; height: 30px; border-radius: 8px; }
-.brand span {
+/* The crest on the intro screen spells out "AuroraCoin" on its own, at
+   128px. Everywhere else it is the compact 64px favicon, which is too small
+   to read as a wordmark, so .brand-title stands in next to it - down to a
+   width where it and the header's other button stop both fitting; below
+   that, flex-wrap on .header-row is the fallback. */
+.brand img { width: 64px; height: 64px; border-radius: 10px; }
+.brand-hero img { width: 128px; height: 128px; }
+.brand-title {
   font-family: var(--display);
   font-weight: 600;
-  font-size: 1.16rem;
+  font-size: 1.3rem;
   letter-spacing: -.01em;
+}
+@media (max-width: 480px) {
+  .brand-title { display: none; }
 }
 .header-actions { display: flex; align-items: center; gap: 8px; }
 
-/* ---------------- buttons ---------------- */
+/* ---------------- buttons ----------------
+   Flat colour, square corners, and a hard-edged offset shadow instead of a
+   blur - a block floating above its own shadow, not a soft card. Press moves
+   the block down into that shadow (transform + the shadow collapsing to
+   nothing) rather than just dimming it, which is what actually happens when
+   a raised block gets pushed down onto its socket. */
 .btn {
   font-family: var(--ui);
   font-size: 14px;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  padding: 8px 15px;
+  font-weight: 700;
+  color: #fff;
+  border: none;
+  border-radius: 0;
+  padding: 10px 16px;
   cursor: pointer;
-  transition: background-color .15s ease, border-color .15s ease, transform .06s ease;
+  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, .35);
+  transition: filter .1s ease, transform .08s ease, box-shadow .08s ease;
   white-space: nowrap;
 }
-.btn:active { transform: translateY(1px); }
-.btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+.btn:hover:not(:disabled) { filter: brightness(1.15); }
+.btn:active:not(:disabled) {
+  filter: brightness(.85);
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, .35);
+}
+.btn:disabled { opacity: .55; cursor: not-allowed; }
 
-.btn-primary { background: var(--earned); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--earned) 86%, black); }
-
-.btn-quiet { background: transparent; color: var(--ink-2); border-color: var(--line-2); }
-.btn-quiet:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
-
-.btn-danger { background: var(--danger); color: #fff; }
-.btn-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 86%, black); }
+.btn-primary { background: var(--earned); }
+.btn-quiet { background: var(--ink-3); }
+.btn-danger { background: var(--danger); }
 
 /* ---------------- balance hero ---------------- */
 .balance {
@@ -545,15 +534,23 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   font-family: var(--ui);
   font-size: 14px;
   font-weight: 700;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line-2);
-  background: var(--bg);
-  color: var(--ink-2);
+  color: #fff;
+  background: var(--ink-3);
+  border: none;
+  border-radius: 0;
+  padding: 8px 10px;
   cursor: pointer;
+  box-shadow: 3px 3px 0 0 rgba(0, 0, 0, .35);
+  transition: filter .1s ease, transform .08s ease, box-shadow .08s ease;
 }
-.direction-btn.is-active.is-earned { background: var(--earned-bg); border-color: var(--earned); color: var(--earned); }
-.direction-btn.is-active.is-spent { background: var(--spent-bg); border-color: var(--spent); color: var(--spent); }
+.direction-btn:hover { filter: brightness(1.15); }
+.direction-btn:active {
+  filter: brightness(.85);
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, .35);
+}
+.direction-btn.is-active.is-earned { background: var(--earned); }
+.direction-btn.is-active.is-spent { background: var(--spent); }
 
 .alert {
   background: var(--danger-bg);
@@ -574,24 +571,86 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   border: 0;
 }
 
-/* ---------------- intro ---------------- */
-.intro { padding: 48px 0 40px; max-width: 34rem; }
-.intro-title {
-  font-family: var(--display);
-  font-weight: 600;
-  font-size: clamp(1.9rem, 6vw, 2.7rem);
-  line-height: 1.12;
-  letter-spacing: -.02em;
-  margin: 0 0 22px;
-  text-wrap: balance;
+/* ---------------- intro ----------------
+   Aurora, a speech bubble, and nothing else - the header above already
+   carries the logo, title and sign-in. */
+.intro {
+  min-height: 70dvh;
+  padding: 24px 0 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 22px;
 }
-.intro-body p { color: var(--ink-2); font-size: 16px; margin: 0 0 14px; }
-.intro-actions { margin-top: 30px; }
-.btn-lg { font-size: 15px; padding: 11px 22px; }
-.intro-note { font-size: 13px; color: var(--ink-3); margin: 10px 0 0; }
-.intro-alert { margin-top: 18px; }
+/* ---------------- mascot (shared: intro, onboarding) ----------------
+   Aurora plus her speech bubble. Which side she stands on is just DOM order
+   inside the flex row - callers put <img> first or the bubble first - but
+   the bubble's tail defaults to pointing right, so a caller putting her on
+   the left adds `is-flipped` to move it to the other edge instead. Only the
+   intro screen's scene is a real control (role="button"), so the pointer
+   cursor is scoped to that rather than baked into the shared layout. */
+.mascot-scene {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.mascot-scene[role="button"] { cursor: pointer; }
+.mascot-bubble {
+  position: relative;
+  flex: 1;
+  background: var(--line);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, .35);
+}
+/* The tail: a small square rotated into a diamond, half-tucked behind the
+   bubble's edge so it reads as attached rather than floating. */
+.mascot-bubble::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -7px;
+  width: 16px;
+  height: 16px;
+  background: var(--line);
+  transform: translateY(-50%) rotate(45deg);
+}
+.mascot-bubble.is-flipped::after { left: -7px; right: auto; }
+.mascot-line {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  min-height: 1.5em;
+}
+.mascot-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  background: currentColor;
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.mascot-hint {
+  margin: 10px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  animation: blink 1.4s step-end infinite;
+}
+.mascot {
+  width: 34vw;
+  max-width: 168px;
+  min-width: 108px;
+  flex-shrink: 0;
+}
+.intro-alert { margin: 0; }
 .intro-pair {
-  margin-top: 38px;
   padding-top: 18px;
   border-top: 1px solid var(--line);
   font-size: 13px;
@@ -615,16 +674,6 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   letter-spacing: -.015em;
   margin: 0 0 18px;
 }
-.notice {
-  background: var(--warn-bg);
-  color: var(--warn);
-  border-radius: var(--radius-sm);
-  padding: 12px 14px;
-  font-size: 13px;
-  line-height: 1.5;
-  margin-bottom: 22px;
-}
-.notice strong { color: inherit; }
 .added-list {
   list-style: none;
   margin: 0 0 18px;
@@ -646,6 +695,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
    rhythm, so no screen has to invent its own margins for them. */
 .onboarding .state { margin-bottom: 20px; }
 .onboarding .alert { margin-top: 14px; }
+.onboarding .mascot-scene { margin-bottom: 26px; }
 
 /* ---------------- family dashboard ---------------- */
 .family-head { padding: 34px 0 22px; }

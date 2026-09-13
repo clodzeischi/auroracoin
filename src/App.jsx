@@ -93,11 +93,13 @@ export const App = () => {
         return () => window.removeEventListener('popstate', onPopState);
     }, []);
 
-    const shell = (content) => (
+    // `hero` is true only for the intro screen - the one place the crest
+    // gets to be the full-size logo rather than the compact favicon.
+    const shell = (content, hero = false) => (
         <>
             <MockDataBanner user={user} />
             <div className="shell">
-                <Header user={user} loading={authLoading} login={login} logout={logout} />
+                <Header user={user} loading={authLoading} login={login} logout={logout} hero={hero} />
                 {content}
             </div>
         </>
@@ -108,12 +110,13 @@ export const App = () => {
     if (!user) {
         return shell(
             <Intro
-                onSignIn={login}
                 // Reading a pairing code requires being signed in, so setting up
                 // a child's device starts with an anonymous session and only
-                // then asks for the code.
+                // then asks for the code. Google sign-in itself lives in the
+                // header now, not here - see Header.jsx.
                 onPairDevice={() => backend.startChildSession()}
-            />
+            />,
+            true
         );
     }
 

@@ -16,7 +16,9 @@ import { getBackend } from './data/index.js';
  */
 const backend = getBackend();
 
-const onboarding = () => screen.queryByRole('heading', { name: /add your children/i });
+// Onboarding no longer carries its own heading - Aurora's dialogue replaced
+// it - so the add-children step is identified by its actual field instead.
+const onboarding = () => screen.queryByLabelText(/child's nickname/i);
 const dashboard = () => screen.queryByRole('heading', { name: /the aurora house/i });
 
 beforeEach(async () => {
@@ -48,7 +50,7 @@ describe('first-run setup', () => {
     render(<App />);
 
     await act(async () => backend.loginAs('parent'));
-    expect(await screen.findByRole('heading', { name: /name your family/i })).toBeInTheDocument();
+    expect(await screen.findByLabelText(/family nickname/i)).toBeInTheDocument();
 
     await signInAndCreateFamily(user);
     expect(onboarding()).toBeInTheDocument();
