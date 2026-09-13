@@ -1,11 +1,19 @@
 import { useState } from 'react';
+import { useTypewriter } from '../hooks/useTypewriter.js';
+import { MOOD_IMAGE } from '../data/mascot.js';
 
-const PrivacyNotice = ({ children }) => (
-    <div className="notice">
-        <strong>Use a nickname.</strong> {children} This page is hosted on Google, so
-        Google's data policies apply to anything you type here.
-    </div>
-);
+// One line per step, in Aurora's own voice - she carries the guidance and
+// the nickname/privacy reminder that used to be a separate notice block.
+const LINES = {
+    family: {
+        text: "First, create a nickname for your family. Mine is called House Aurora.",
+        mood: 'talk',
+    },
+    children: {
+        text: "Now add your kids. Remember to use nicknames! We should respect all children's privacy!",
+        mood: 'wink',
+    },
+};
 
 export const Onboarding = ({ family, childCount = 0, onCreateFamily, onAddChild, onLeave }) => {
     const [name, setName] = useState('');
@@ -14,6 +22,12 @@ export const Onboarding = ({ family, childCount = 0, onCreateFamily, onAddChild,
 
     const step = family ? 'children' : 'family';
     const [added, setAdded] = useState([]);
+
+    const line = LINES[step];
+    const { shown, done } = useTypewriter(line.text);
+    // `talk` settles to `idle` once the line has finished typing and she's
+    // just standing there; `wink` holds for the whole line, same as intro.
+    const mood = line.mood === 'talk' ? (done ? 'idle' : 'talk') : line.mood;
 
     const submit = async () => {
         const trimmed = name.trim();
@@ -41,35 +55,31 @@ export const Onboarding = ({ family, childCount = 0, onCreateFamily, onAddChild,
 
     return (
         <main className="onboarding">
-            {step === 'family' ? (
-                <>
-                    <p className="eyebrow">Step 1 of 2</p>
-                    <h1 className="onboarding-title">Name your family</h1>
-                    <PrivacyNotice>
-                        Something like “The Aurora House”. Don't enter anything you want
-                        to keep private.
-                    </PrivacyNotice>
+            {/* She stands on the left here, opposite the intro screen, so the
+                bubble's tail flips to the bubble's left edge to still point
+                at her - see `is-flipped` in styles.css. */}
+            <div className="mascot-scene">
+                <img className="mascot" src={MOOD_IMAGE[mood]} alt="" />
+                <div className="mascot-bubble is-flipped">
+                    <p className="mascot-line">
+                        {shown}
+                        {!done && <span className="mascot-cursor" aria-hidden="true" />}
+                    </p>
+                </div>
+            </div>
 
-                    <div className="field">
-                        <label htmlFor="family-name">Family nickname</label>
-                        <input
-                            id="family-name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            maxLength={60}
-                        />
-                    </div>
-                </>
+            {step === 'family' ? (
+                <div className="field">
+                    <label htmlFor="family-name">Family nickname</label>
+                    <input
+                        id="family-name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        maxLength={60}
+                    />
+                </div>
             ) : (
                 <>
-                    <p className="eyebrow">Step 2 of 2</p>
-                    <h1 className="onboarding-title">Add your children</h1>
-                    <PrivacyNotice>
-                        Do <strong>not</strong> enter your child's real name, birthday, or
-                        anything else that identifies them. A nickname is all this app
-                        ever needs.
-                    </PrivacyNotice>
-
                     {added.length > 0 && (
                         <ul className="added-list" aria-label="Children added">
                             {added.map((child) => <li key={child}>{child}</li>)}

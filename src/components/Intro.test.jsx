@@ -1,25 +1,75 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Intro } from './Intro.jsx';
-import {
-  CHILD_SESSIONS_DISABLED, SESSION_CANCELLED, SESSION_UNAVAILABLE, sessionFailure,
-} from '../data/session.js';
+import { CHILD_SESSIONS_DISABLED, SESSION_UNAVAILABLE, sessionFailure } from '../data/session.js';
 
-const setup = (overrides = {}) => {
-  const handlers = {
-    onSignIn: vi.fn(() => Promise.resolve()),
-    onPairDevice: vi.fn(() => Promise.resolve()),
-    ...overrides,
-  };
-  render(<Intro {...handlers} />);
-  return { ...handlers, user: userEvent.setup() };
-};
-
+const scene = () => screen.getByRole('button', { name: 'Continue' });
 const pairLink = () => screen.getByRole('button', { name: /pair it with a code|starting/i });
-const signIn = () => screen.getByRole('button', { name: /sign in with google|signing in/i });
+
+describe("Aurora's greeting", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  // Comfortably longer than the slowest line at 22ms/character.
+  const finishTyping = () => act(() => vi.advanceTimersByTime(5000));
+
+  it('greets with the first line, fully typed', () => {
+    render(<Intro onPairDevice={vi.fn()} />);
+    finishTyping();
+    expect(screen.getByText('Hi, welcome to AuroraCoin!')).toBeInTheDocument();
+  });
+
+  it('offers to continue only once the line has finished typing', () => {
+    render(<Intro onPairDevice={vi.fn()} />);
+    expect(screen.queryByText(/tap\/click to continue/i)).not.toBeInTheDocument();
+
+    finishTyping();
+    expect(screen.getByText(/tap\/click to continue/i)).toBeInTheDocument();
+  });
+
+  it('a tap while typing finishes the line rather than skipping it', () => {
+    render(<Intro onPairDevice={vi.fn()} />);
+    act(() => vi.advanceTimersByTime(22)); // one character in
+
+    fireEvent.click(scene());
+
+    expect(screen.getByText('Hi, welcome to AuroraCoin!')).toBeInTheDocument();
+  });
+
+  it('advances to the next line on tap once the current one is done', () => {
+    render(<Intro onPairDevice={vi.fn()} />);
+    finishTyping();
+    fireEvent.click(scene());
+    finishTyping();
+
+    expect(screen.getByText(/teaches your kids financial responsibility/)).toBeInTheDocument();
+  });
+
+  it('settles on the closing reminder and stops responding to taps', () => {
+    render(<Intro onPairDevice={vi.fn()} />);
+
+    for (let clicks = 0; clicks < 6; clicks += 1) {
+      finishTyping();
+      fireEvent.click(scene());
+    }
+    finishTyping();
+
+    expect(screen.getByText(/never input any personal information/)).toBeInTheDocument();
+    expect(screen.queryByText(/tap\/click to continue/i)).not.toBeInTheDocument();
+
+    fireEvent.click(scene());
+    expect(screen.getByText(/never input any personal information/)).toBeInTheDocument();
+  });
+});
 
 describe('starting a child device', () => {
+  const setup = (overrides = {}) => {
+    const handlers = { onPairDevice: vi.fn(() => Promise.resolve()), ...overrides };
+    render(<Intro {...handlers} />);
+    return { ...handlers, user: userEvent.setup() };
+  };
+
   it('begins a session when the pairing link is used', async () => {
     const { onPairDevice, user } = setup();
     await user.click(pairLink());
@@ -27,10 +77,6 @@ describe('starting a child device', () => {
     expect(onPairDevice).toHaveBeenCalled();
   });
 
-  /**
-   * The whole reason this component holds state: the promise used to be
-   * dropped, so a refused sign-in was indistinguishable from a dead button.
-   */
   it('says so when child devices are switched off for the project', async () => {
     const { user } = setup({
       onPairDevice: vi.fn(() => Promise.reject(sessionFailure(CHILD_SESSIONS_DISABLED))),
@@ -67,29 +113,6 @@ describe('starting a child device', () => {
     await user.click(pairLink());
 
     expect(screen.getByRole('button', { name: /starting/i })).toBeDisabled();
-    expect(signIn()).toBeDisabled();
     release();
-  });
-});
-
-describe('signing in as a parent', () => {
-  it('reports a refused sign-in rather than looking inert', async () => {
-    const { user } = setup({
-      onSignIn: vi.fn(() => Promise.reject(sessionFailure(SESSION_UNAVAILABLE))),
-    });
-    await user.click(signIn());
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(/could not start/i);
-  });
-
-  /** Closing the Google popup is a decision, not something to apologise for. */
-  it('stays quiet when the popup is simply closed', async () => {
-    const { user } = setup({
-      onSignIn: vi.fn(() => Promise.reject(sessionFailure(SESSION_CANCELLED))),
-    });
-    await user.click(signIn());
-
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(signIn()).toBeEnabled();
   });
 });
