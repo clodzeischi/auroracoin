@@ -330,6 +330,24 @@ describe('transactions', () => {
     );
   });
 
+  it('refuses a transaction over the single-entry cap', async () => {
+    await assertFails(
+      addDoc(collection(asParent(env), ...txPath()), validTransaction({ amountMinor: 1000001 }))
+    );
+  });
+
+  it('refuses a spend over the single-entry cap', async () => {
+    await assertFails(
+      addDoc(collection(asParent(env), ...txPath()), validTransaction({ amountMinor: -1000001 }))
+    );
+  });
+
+  it('allows a transaction right at the single-entry cap', async () => {
+    await assertSucceeds(
+      addDoc(collection(asParent(env), ...txPath()), validTransaction({ amountMinor: 1000000 }))
+    );
+  });
+
   it('refuses an unknown category', async () => {
     await assertFails(
       addDoc(collection(asParent(env), ...txPath()), validTransaction({ category: 'crypto' }))

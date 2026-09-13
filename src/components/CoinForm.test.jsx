@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CoinForm } from './CoinForm.jsx';
 import { createFakeBackend } from '../test/fakeBackend.js';
@@ -244,5 +244,91 @@ describe('CoinForm', () => {
     await user.click(submit());
 
     expect(backend.addTransaction).not.toHaveBeenCalled();
+  });
+
+  describe('single-entry cap', () => {
+    it('refuses an amount over $10,000', async () => {
+      const { backend, user } = setup();
+
+      await user.type(amountField(), '10000.01');
+      await user.selectOptions(categoryField(), 'chores');
+      await user.click(submit());
+
+      expect(backend.addTransaction).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toHaveTextContent(/single transaction/i);
+    });
+
+    it('allows exactly $10,000', async () => {
+      const { backend, user } = setup();
+
+      await user.type(amountField(), '10000');
+      await user.selectOptions(categoryField(), 'chores');
+      await user.click(submit());
+
+      expect(backend.addTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({ amountMinor: 1000000 })
+      );
+    });
+
+    it('applies the cap to a spend the same as an earn', async () => {
+      const { backend, user } = setup();
+
+      await user.click(screen.getByRole('button', { name: 'Spent' }));
+      await user.type(amountField(), '10000.01');
+      await user.selectOptions(categoryField(), 'toys');
+      await user.click(submit());
+
+      expect(backend.addTransaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('running-balance cap', () => {
+    /**
+     * The fake backend's transactions never resolve unless a test emits them,
+     * so this needs to explicitly settle that subscription before the cap has
+     * anything to compare against.
+     */
+    it('refuses an amount that would push the balance past $1,000,000', async () => {
+      const { backend, user } = setup();
+      act(() => backend.emitTransactions([{ id: 'tx-0', amountMinor: 99_999_000 }]));
+
+      await user.type(amountField(), '2000');
+      await user.selectOptions(categoryField(), 'chores');
+      await user.click(submit());
+
+      expect(backend.addTransaction).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toHaveTextContent(/balance/i);
+    });
+
+    it('refuses a spend that would push the balance past -$1,000,000, i.e. too far into debt', async () => {
+      const { backend, user } = setup();
+      act(() => backend.emitTransactions([{ id: 'tx-0', amountMinor: -99_999_000 }]));
+
+      await user.click(screen.getByRole('button', { name: 'Spent' }));
+      await user.type(amountField(), '2000');
+      await user.selectOptions(categoryField(), 'toys');
+      await user.click(submit());
+
+      expect(backend.addTransaction).not.toHaveBeenCalled();
+    });
+
+    it('allows an edit that reduces an entry, even if the balance is already over the cap', async () => {
+      // Correcting a typo downward should never itself be refused - only a
+      // change that leaves the balance further past the cap than it already
+      // was ought to be, and this one brings it back under.
+      const { backend, user } = setup({
+        transaction: { id: 'tx-1', amountMinor: 99_999_000, category: 'gift', comment: '' },
+      });
+      act(() => backend.emitTransactions([{ id: 'tx-1', amountMinor: 99_999_000 }]));
+
+      await user.clear(amountField());
+      await user.type(amountField(), '5000');
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+
+      expect(backend.updateTransaction).toHaveBeenCalledWith(
+        'tx-1',
+        expect.objectContaining({ amountMinor: 500000 })
+      );
+    });
   });
 });

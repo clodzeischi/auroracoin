@@ -2,10 +2,23 @@ import {useEffect, useRef, useState} from "react";
 import {Modal} from "./Modal.jsx";
 import {categoriesForAmount} from "../data/categories.js";
 import {parseAmountInput, formatMinor} from "../utils/money.js";
+import {useTransactions} from "../hooks/useTransactions.js";
 
 // Amounts are entered as decimals and stored as integer hundredths, which is
 // also what the Firestore rule validates (`amountMinor is int`).
 const parseAmount = parseAmountInput;
+
+// 1,000,000 hundredths is $10,000 on a single entry - mirrored in
+// firestore.rules' hasValidCore, which is the actual enforcement; this copy
+// exists only so a typo gets a specific message instead of the generic
+// "could not save" a rules rejection produces.
+const MAX_TRANSACTION_MINOR = 1_000_000;
+
+// 100,000,000 hundredths is $1,000,000 either direction. Rules cannot sum a
+// whole subcollection on every write, so unlike the cap above, this one is a
+// client-side guard only, not a security boundary - a parent editing the
+// database directly could still exceed it.
+const MAX_BALANCE_MINOR = 100_000_000;
 
 export const CoinForm = ({ isOpen, toggle, user, backend, transaction = null }) => {
 
@@ -23,6 +36,11 @@ export const CoinForm = ({ isOpen, toggle, user, backend, transaction = null }) 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const amountRef = useRef(null);
+
+    // For the running-balance cap only - always subscribed, same as
+    // CoinCount/CoinDashboard/CoinTable, so it already has data by the time
+    // this form is opened rather than racing the first render after.
+    const { totalMinor, loading: balanceLoading } = useTransactions(backend);
 
     // Escape and click-away are Modal's job; the amount field taking focus on
     // open is this form's own, since Modal makes no assumption about which
@@ -54,6 +72,10 @@ export const CoinForm = ({ isOpen, toggle, user, backend, transaction = null }) 
             setError('Enter a non-zero amount with up to two decimal places.');
             return;
         }
+        if (Math.abs(parsedAmount) > MAX_TRANSACTION_MINOR) {
+            setError(`A single transaction can't be more than ${formatMinor(MAX_TRANSACTION_MINOR)} coins.`);
+            return;
+        }
         if (!category) {
             setError('Choose a category.');
             return;
@@ -61,6 +83,18 @@ export const CoinForm = ({ isOpen, toggle, user, backend, transaction = null }) 
         if (!user) {
             setError('You must be signed in to add a transaction.');
             return;
+        }
+        // Editing replaces the prior amount rather than adding to it, so the
+        // balance this edit would produce has to subtract that amount back
+        // out first - otherwise correcting a typo down would look like it
+        // was still pushing the balance further past the cap.
+        if (!balanceLoading) {
+            const priorAmount = isEditing ? transaction.amountMinor : 0;
+            const resultingBalance = totalMinor - priorAmount + parsedAmount;
+            if (Math.abs(resultingBalance) > MAX_BALANCE_MINOR) {
+                setError(`That would put the balance past ${formatMinor(MAX_BALANCE_MINOR)} coins.`);
+                return;
+            }
         }
 
         setLoading(true);
@@ -145,6 +179,7 @@ export const CoinForm = ({ isOpen, toggle, user, backend, transaction = null }) 
                     inputMode="decimal"
                     step="0.01"
                     min="0"
+                    max={formatMinor(MAX_TRANSACTION_MINOR)}
                     id="amount"
                     value={amount}
                     onChange={e => setAmount(e.target.value)}

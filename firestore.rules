@@ -110,10 +110,18 @@ service cloud.firestore {
     // an integer number of hundredths, never a float: money summed as floats
     // drifts, and a decimal check in rules is unreliable because 10.07 * 100
     // is 1006.9999999999999.
+    //
+    // 1000000 hundredths is 10,000.00 - a single entry this large is almost
+    // certainly a typo (an extra zero, a decimal point in the wrong place),
+    // and it is the one amount bound rules can actually enforce: rules have
+    // no way to sum a whole subcollection, so the running-balance cap in
+    // CoinForm.jsx (kept in sync with this file by comment, not by code -
+    // they are two different languages) is a client-side guard only, not a
+    // security boundary.
     function hasValidCore(d) {
       return d.amountMinor is int
         && d.amountMinor != 0
-        && math.abs(d.amountMinor) <= 100000000
+        && math.abs(d.amountMinor) <= 1000000
         && isValidCategory(d.category)
         && d.comment is string
         && d.comment.size() <= 500
