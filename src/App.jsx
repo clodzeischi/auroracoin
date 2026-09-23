@@ -7,6 +7,7 @@ import { AcceptInvite } from "./components/AcceptInvite.jsx";
 import { ChildLedger } from "./components/ChildLedger.jsx";
 import { ChildApp } from "./components/ChildApp.jsx";
 import { MockDataBanner } from "./components/MockDataBanner.jsx";
+import { CloudField } from "./components/CloudField.jsx";
 import { useAuth } from "./hooks/useAuth.js";
 import { useFamily } from "./hooks/useFamily.js";
 import { useInvite } from "./hooks/useInvite.js";
@@ -93,13 +94,12 @@ export const App = () => {
         return () => window.removeEventListener('popstate', onPopState);
     }, []);
 
-    // `hero` is true only for the intro screen - the one place the crest
-    // gets to be the full-size logo rather than the compact favicon.
-    const shell = (content, hero = false) => (
+    const shell = (content) => (
         <>
+            <CloudField />
             <MockDataBanner user={user} />
             <div className="shell">
-                <Header user={user} loading={authLoading} login={login} logout={logout} hero={hero} />
+                <Header user={user} loading={authLoading} login={login} logout={logout} />
                 {content}
             </div>
         </>
@@ -115,8 +115,7 @@ export const App = () => {
                 // then asks for the code. Google sign-in itself lives in the
                 // header now, not here - see Header.jsx.
                 onPairDevice={() => backend.startChildSession()}
-            />,
-            true
+            />
         );
     }
 

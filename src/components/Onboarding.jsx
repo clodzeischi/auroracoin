@@ -55,12 +55,9 @@ export const Onboarding = ({ family, childCount = 0, onCreateFamily, onAddChild,
 
     return (
         <main className="onboarding">
-            {/* She stands on the left here, opposite the intro screen, so the
-                bubble's tail flips to the bubble's left edge to still point
-                at her - see `is-flipped` in styles.css. */}
             <div className="mascot-scene">
                 <img className="mascot" src={MOOD_IMAGE[mood]} alt="" />
-                <div className="mascot-bubble is-flipped">
+                <div className="mascot-bubble">
                     <p className="mascot-line">
                         {shown}
                         {!done && <span className="mascot-cursor" aria-hidden="true" />}

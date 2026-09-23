@@ -3,7 +3,7 @@ import {isChild} from "../data/roles.js";
 import {ConfirmDialog} from "./ConfirmDialog.jsx";
 import {SESSION_CANCELLED} from "../data/session.js";
 
-export const Header = ({user, loading, login, logout, hero = false}) => {
+export const Header = ({user, loading, login, logout}) => {
 
     const child = isChild(user);
     // Confirmed rather than immediate: a child's session is anonymous, so
@@ -48,15 +48,12 @@ export const Header = ({user, loading, login, logout, hero = false}) => {
     return (
         <header className="header">
             <div className="header-row">
-                {/* The full crest on the hero screen already spells out
-                    "AuroraCoin" on its own, so no separate wordmark sits next
-                    to it there. The compact favicon elsewhere is too small to
-                    read as a wordmark, so the title comes back next to it -
-                    dropped again below a width where the two can't both fit
-                    next to the header's other button (see .brand-title). */}
-                <a className={`brand${hero ? ' brand-hero' : ''}`} href="/">
-                    <img alt={hero ? 'AuroraCoin' : ''} src={hero ? '/aurora_logo_512.png' : '/icon.png'} />
-                    {!hero && <span className="brand-title">AuroraCoin</span>}
+                {/* logo.png spells out "AuroraCoin" on its own, so no separate
+                    text wordmark sits next to it - icon.png is the favicon
+                    only (see index.html). One size everywhere: see .brand
+                    img in styles.css. */}
+                <a className="brand" href="/">
+                    <img alt="AuroraCoin" src="/logo.png" />
                 </a>
                 <div className="header-actions">
                     {/* While auth is still resolving, render nothing rather than
