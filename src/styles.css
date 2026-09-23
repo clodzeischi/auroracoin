@@ -25,22 +25,36 @@
   --warn:       #F5A524;
   --warn-bg:    #FFF0C2;
 
-  --shadow-sm: 0 1px 2px rgba(34, 49, 79, .10);
-  --shadow-md: 0 4px 16px -4px rgba(34, 49, 79, .16);
-  --shadow-lg: 0 24px 60px -12px rgba(34, 49, 79, .30);
+  /* Flat offset shadows, no blur - a block floating above its own shadow
+     rather than a soft card. Matches .btn's hand-set shadow rather than
+     the other way around, so raised UI reads as one consistent material. */
+  --shadow-sm: 3px 3px 0 0 rgba(0, 0, 0, .25);
+  --shadow-md: 5px 5px 0 0 rgba(0, 0, 0, .30);
+  --shadow-lg: 8px 8px 0 0 rgba(0, 0, 0, .35);
 
-  --radius:    14px;
-  --radius-sm: 9px;
+  /* Every corner is square. Kept as tokens (rather than deleted) because
+     the rules that reference them are the record of which elements used
+     to be rounded - zeroing here is the whole "no rounded corners" pass. */
+  --radius:    0;
+  --radius-sm: 0;
 
-  /* Press Start 2P is the display face - titles, balances, anywhere
-     text is big enough for true 8-bit blocks to read cleanly. Pixelify
-     Sans carries body copy and controls, where Press Start 2P's fixed
-     block width would make a ledger unreadable. --mono stays a plain
-     system stack: the pairing code needs unambiguous glyphs read aloud
-     across a room, not a pixel-art moment. */
-  --ui: "Pixelify Sans", "Press Start 2P", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --display: "Press Start 2P", "Pixelify Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* One face, everywhere: Jersey 10, for prose and controls (--ui) as much
+     as for titles and every number (--display) - it replaced Pixelify Sans
+     for body copy too rather than staying a numbers-only face, so the app
+     is not mixing two pixel grammars. It replaced Silkscreen and, before
+     that, Press Start 2P as the numeric face - both had digits (5, 6, 8, 9,
+     0 especially) too similar to read at a glance below display size;
+     Jersey 10's scoreboard-style numerals stay legible even at ledger-row
+     size, which is why it is reached for per-element (see the tabular-nums
+     rules) rather than only through --display's titles. The fallback is
+     the system monospace stack, not a system sans - if Jersey 10 fails to
+     load, a fixed-width face reads as more deliberately "retro" than a
+     default sans standing in for a pixel font would. --mono is that same
+     stack named for its other use: the pairing code needs unambiguous
+     glyphs read aloud across a room, not a pixel-art moment. */
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  --ui: "Jersey 10", var(--mono);
+  --display: "Jersey 10", var(--mono);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -53,17 +67,11 @@ body {
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
-  /* Pixelify Sans's "fi" ligature glyph renders as something closer to "A"
-     at UI sizes - "financial" becomes "Anancial". Neither pixel face was
-     drawn with ligatures in mind, so turn them off everywhere rather than
-     patch copy around it. */
-  font-variant-ligatures: none;
 }
 
 :focus-visible {
   outline: 2px solid var(--earned);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -96,7 +104,6 @@ body {
   color: inherit;
   background: transparent;
   border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
-  border-radius: 999px;
   padding: 1px 10px;
   cursor: pointer;
   opacity: .7;
@@ -111,6 +118,7 @@ body {
 
 /* Child ledger: the amount is text, not a control. */
 .amount-plain {
+  font-family: var(--display);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -137,21 +145,28 @@ body {
 }
 .header .alert { margin-top: 10px; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
-/* The crest on the intro screen spells out "AuroraCoin" on its own, at
-   128px. Everywhere else it is the compact 64px favicon, which is too small
-   to read as a wordmark, so .brand-title stands in next to it - down to a
-   width where it and the header's other button stop both fitting; below
-   that, flex-wrap on .header-row is the fallback. */
-.brand img { width: 64px; height: 64px; border-radius: 10px; }
-.brand-hero img { width: 128px; height: 128px; }
-.brand-title {
-  font-family: var(--display);
-  font-weight: 600;
-  font-size: 1.3rem;
-  letter-spacing: -.01em;
+/* One size everywhere - logo.png carries its own "AuroraCoin" wordmark, so
+   there is no separate text label sized against it and nothing keying off
+   screen (the old hero/compact split is gone). 96px is large enough to
+   keep that wordmark legible; translateY in % (not px) is relative to the
+   image's own box, so the bob stays proportional if this size ever
+   changes again. Linear timing between eight sine-sampled keyframe points,
+   rather than easing between two, is what keeps it an actual sine wave
+   instead of a bounce. */
+.brand img {
+  width: 96px;
+  height: 96px;
+  animation: logo-bob 4s linear infinite;
 }
-@media (max-width: 480px) {
-  .brand-title { display: none; }
+@keyframes logo-bob {
+  0%, 100% { transform: translateY(0); }
+  12.5%    { transform: translateY(-5.7%); }
+  25%      { transform: translateY(-8%); }
+  37.5%    { transform: translateY(-5.7%); }
+  50%      { transform: translateY(0); }
+  62.5%    { transform: translateY(5.7%); }
+  75%      { transform: translateY(8%); }
+  87.5%    { transform: translateY(5.7%); }
 }
 .header-actions { display: flex; align-items: center; gap: 8px; }
 
@@ -188,28 +203,12 @@ body {
 
 /* ---------------- balance hero ---------------- */
 .balance {
-  position: relative;
   text-align: center;
   padding: 40px 20px 34px;
-  overflow: hidden;
 }
-/* The one flourish: an aurora wash behind the number. */
-.balance::before {
-  content: "";
-  position: absolute;
-  inset: -40% 10% auto;
-  height: 220px;
-  background:
-    radial-gradient(50% 60% at 30% 50%, color-mix(in srgb, var(--earned) 22%, transparent), transparent 70%),
-    radial-gradient(45% 55% at 70% 45%, color-mix(in srgb, var(--spent) 20%, transparent), transparent 70%);
-  filter: blur(38px);
-  pointer-events: none;
-  z-index: 0;
-}
-.balance > * { position: relative; z-index: 1; }
 .balance-label {
   margin: 0 0 4px;
-  font-size: 11.5px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -230,7 +229,7 @@ body {
   display: block;
   margin-top: 8px;
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: 19.5px;
   font-weight: 600;
   letter-spacing: .1em;
   text-transform: uppercase;
@@ -241,8 +240,7 @@ body {
 /* ---------------- card ---------------- */
 .card {
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border: 2px solid var(--ink);
   box-shadow: var(--shadow-sm);
   padding: 20px;
   margin-bottom: 20px;
@@ -266,7 +264,7 @@ body {
 /* ---------------- stats ---------------- */
 .stats { display: flex; gap: 26px; flex-wrap: wrap; }
 .stat-label {
-  font-size: 10.5px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -299,13 +297,13 @@ body {
 }
 .bd-title {
   margin: 0;
-  font-size: 10.5px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
-.bd-total { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 14px; }
+.bd-total { font-family: var(--display); font-weight: 700; font-variant-numeric: tabular-nums; font-size: 14px; }
 .bd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .bd-row-top {
   display: flex;
@@ -316,10 +314,10 @@ body {
   margin-bottom: 5px;
 }
 .bd-name { font-weight: 600; }
-.bd-figures { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bd-figures { font-family: var(--display); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .bd-share { color: var(--ink-3); margin-left: 8px; font-size: 12.5px; }
-.bd-track { height: 7px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
-.bd-fill { height: 100%; border-radius: 999px; }
+.bd-track { height: 7px; background: var(--surface-2); overflow: hidden; }
+.bd-fill { height: 100%; }
 .bd-fill.is-earned { background: var(--earned); }
 .bd-fill.is-spent { background: var(--spent); }
 .bd-empty { color: var(--ink-3); font-size: 13px; margin: 0; }
@@ -331,9 +329,8 @@ body {
   font-weight: 600;
   color: var(--ink);
   background: var(--surface-2);
-  border: 1px solid var(--line-2);
-  border-radius: var(--radius-sm);
-  padding: 7px 30px 7px 11px;
+  border: 2px solid var(--ink);
+  padding: 6px 29px 6px 10px;
   cursor: pointer;
   appearance: none;
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
@@ -348,7 +345,7 @@ body {
 table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 .ledger th {
   text-align: left;
-  font-size: 10.5px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: .11em;
   text-transform: uppercase;
@@ -365,6 +362,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 /* The amount is the edit control: it looks like text, behaves like a button. */
 .amount-btn {
   font: inherit;
+  font-family: var(--display);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   background: none;
@@ -372,7 +370,6 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   padding: 2px 2px;
   margin: -2px -2px;
   cursor: pointer;
-  border-radius: 5px;
   text-decoration-color: transparent;
   transition: text-decoration-color .15s ease;
 }
@@ -394,7 +391,6 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   line-height: 1;
   background: none;
   border: 0;
-  border-radius: 8px;
   color: var(--ink-3);
   cursor: pointer;
   opacity: .55;
@@ -426,7 +422,6 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   font-weight: 700;
   letter-spacing: .02em;
   padding: 3px 9px;
-  border-radius: 999px;
   background: var(--surface-2);
   color: var(--ink-2);
   white-space: nowrap;
@@ -452,13 +447,15 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   backdrop-filter: blur(3px);
   animation: fade .16s ease;
 }
+/* JRPG window frame: a thick ink border, a tan ring one step further out
+   (the "double border" classic dialogue boxes use to separate frame from
+   backdrop), then the same hard drop shadow every raised block gets. */
 .modal {
   width: 100%;
   max-width: 400px;
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
+  border: 3px solid var(--ink);
+  box-shadow: 0 0 0 3px var(--surface-2), var(--shadow-lg);
   animation: rise .18s cubic-bezier(.2, .8, .3, 1);
 }
 @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
@@ -467,44 +464,50 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 .modal-sm { max-width: 340px; }
 .confirm-detail {
   margin: 8px 0 0;
+  font-family: var(--display);
   font-size: 14px;
   font-weight: 600;
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
 
+/* A dark nameplate over the cream body, like a JRPG window's title bar -
+   the one part of the frame that inverts, so every dialog's own content
+   (built against --ink-2/--ink-3 on --surface) keeps its contrast as-is. */
 .modal-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 17px 20px;
-  border-bottom: 1px solid var(--line);
+  padding: 13px 18px;
+  background: var(--ink);
+  border-bottom: 3px solid var(--surface-2);
 }
+.modal-head .modal-title { color: var(--surface); }
 .modal-title { margin: 0; font-family: var(--display); font-size: 1.05rem; font-weight: 600; }
 .modal-close {
   background: none;
   border: 0;
   font-size: 21px;
   line-height: 1;
-  color: var(--ink-3);
+  color: var(--surface-2);
   cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 6px;
+  padding: 2px 8px;
 }
-.modal-close:hover { color: var(--ink); background: var(--surface-2); }
+.modal-close:hover { color: var(--ink); background: var(--surface); }
 .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 15px; }
 .modal-foot {
   display: flex;
   justify-content: flex-end;
   gap: 9px;
   padding: 15px 20px;
-  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+  border-top: 2px solid var(--ink);
 }
 
 /* ---------------- fields ---------------- */
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field label, .field-label {
-  font-size: 11px;
+  font-size: 16.5px;
   font-weight: 700;
   letter-spacing: .1em;
   text-transform: uppercase;
@@ -514,18 +517,21 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   font-family: var(--ui);
   font-size: 15px;
   color: var(--ink);
-  background: var(--bg);
-  border: 1px solid var(--line-2);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 2px solid var(--ink);
+  /* A hard inset shadow instead of a blurred one - the field reads as a
+     recessed slot cut into the panel, not a glow. */
+  box-shadow: inset 2px 2px 0 0 rgba(34, 49, 79, .18);
+  padding: 9px 11px;
   width: 100%;
 }
 .field input:focus, .field select:focus {
   border-color: var(--earned);
   outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--earned) 18%, transparent);
+  box-shadow: inset 2px 2px 0 0 rgba(34, 49, 79, .18),
+              0 0 0 3px color-mix(in srgb, var(--earned) 30%, transparent);
 }
-.field select:disabled { background: var(--surface-2); color: var(--ink-3); cursor: not-allowed; }
+.field select:disabled { color: var(--ink-3); cursor: not-allowed; opacity: .55; }
 .field-hint { font-size: 12px; color: var(--ink-3); }
 
 .direction-toggle { display: flex; gap: 8px; }
@@ -584,11 +590,10 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 }
 /* ---------------- mascot (shared: intro, onboarding) ----------------
    Aurora plus her speech bubble. Which side she stands on is just DOM order
-   inside the flex row - callers put <img> first or the bubble first - but
-   the bubble's tail defaults to pointing right, so a caller putting her on
-   the left adds `is-flipped` to move it to the other edge instead. Only the
-   intro screen's scene is a real control (role="button"), so the pointer
-   cursor is scoped to that rather than baked into the shared layout. */
+   inside the flex row - callers put <img> first or the bubble first. Only
+   the intro screen's scene is a real control (role="button"), so the
+   pointer cursor is scoped to that rather than baked into the shared
+   layout. */
 .mascot-scene {
   display: flex;
   align-items: center;
@@ -596,27 +601,13 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 }
 .mascot-scene[role="button"] { cursor: pointer; }
 .mascot-bubble {
-  position: relative;
   flex: 1;
-  background: var(--line);
+  background: var(--surface-2);
   color: var(--ink);
-  border-radius: var(--radius-sm);
+  border: 2px solid var(--ink);
   padding: 16px 18px;
   box-shadow: 4px 4px 0 0 rgba(0, 0, 0, .35);
 }
-/* The tail: a small square rotated into a diamond, half-tucked behind the
-   bubble's edge so it reads as attached rather than floating. */
-.mascot-bubble::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: -7px;
-  width: 16px;
-  height: 16px;
-  background: var(--line);
-  transform: translateY(-50%) rotate(45deg);
-}
-.mascot-bubble.is-flipped::after { left: -7px; right: auto; }
 .mascot-line {
   margin: 0;
   font-size: 14px;
@@ -636,7 +627,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 @keyframes blink { 50% { opacity: 0; } }
 .mascot-hint {
   margin: 10px 0 0;
-  font-size: 11px;
+  font-size: 16.5px;
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
@@ -660,7 +651,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 /* ---------------- onboarding ---------------- */
 .onboarding { padding: 40px 0; max-width: 27rem; }
 .eyebrow {
-  font-size: 10.5px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -688,7 +679,6 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   font-size: 13px;
   font-weight: 600;
   padding: 4px 11px;
-  border-radius: 999px;
 }
 .onboarding-actions { display: flex; gap: 9px; margin-top: 20px; }
 /* A setup screen's lede paragraph and its error both sit in the column's
@@ -720,15 +710,14 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   font: inherit;
   color: inherit;
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border: 2px solid var(--ink);
   box-shadow: var(--shadow-sm);
   padding: 18px 20px;
   cursor: pointer;
   transition: border-color .15s ease, box-shadow .15s ease, transform .06s ease;
 }
-.child-card:hover { border-color: var(--line-2); box-shadow: var(--shadow-md); }
-.child-card:active { transform: translateY(1px); }
+.child-card:hover { border-color: var(--earned); box-shadow: var(--shadow-md); }
+.child-card:active { transform: translate(3px, 3px); box-shadow: 0 0 0 0 rgba(0, 0, 0, .35); }
 .child-card-head {
   display: flex;
   align-items: baseline;
@@ -772,7 +761,6 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   color: var(--ink-3);
   cursor: pointer;
   padding: 6px 2px;
-  border-radius: 6px;
 }
 .back-link:hover { color: var(--ink); }
 
@@ -789,7 +777,6 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   color: inherit;
   cursor: pointer;
   text-align: left;
-  border-radius: 5px;
 }
 .child-name:hover { text-decoration: underline; }
 
@@ -809,7 +796,6 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   padding: 2px 0;
   color: var(--ink-3);
   cursor: pointer;
-  border-radius: 4px;
 }
 .link-btn:hover { color: var(--ink); text-decoration: underline; }
 .link-btn.is-danger:hover { color: var(--danger); }
@@ -872,8 +858,8 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   text-indent: .22em;
   color: var(--ink);
   background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border: 2px solid var(--ink);
+  box-shadow: var(--shadow-sm);
   padding: 16px 10px;
 }
 
@@ -903,3 +889,98 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   color: var(--ink-2);
 }
 .pair-steps strong { color: var(--ink); font-weight: 600; }
+
+/* ============================================================
+   Cloud field
+   Boxy pixel clouds drifting behind everything - three depth layers,
+   smaller/paler/slower standing in for farther away, the classic
+   side-scroller parallax cue. Each cloud is one element: its own box is
+   one "pixel" on a var(--u) grid and box-shadow paints the rest, so the
+   shape stays crisp at any --u instead of being a raster image scaled up.
+   Fixed to the viewport rather than the page, so scrolling never touches
+   it, and z-index:-1 keeps it behind the flat sky colour and everything
+   painted on it - nothing else has to know it is there.
+   ============================================================ */
+.cloud-field {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cloud {
+  position: absolute;
+  left: -25%;
+  width: var(--u);
+  height: var(--u);
+  background: currentColor;
+  /* Both ends of the loop sit off-screen (start left of 0, end past 100vw),
+     so the jump back to the start is never seen - only the drift is. */
+  animation: cloud-drift linear infinite;
+}
+@keyframes cloud-drift {
+  from { transform: translateX(0); }
+  to   { transform: translateX(160vw); }
+}
+
+/* Shape A: a small two-puff cloud, 5 cells wide. */
+.cloud-a {
+  box-shadow:
+    calc(var(--u) *  1) 0                    0 0 currentColor,
+    calc(var(--u) *  2) 0                    0 0 currentColor,
+    calc(var(--u) *  3) 0                    0 0 currentColor,
+    calc(var(--u) * -1) var(--u)             0 0 currentColor,
+    calc(var(--u) *  0) var(--u)             0 0 currentColor,
+    calc(var(--u) *  1) var(--u)             0 0 currentColor,
+    calc(var(--u) *  2) var(--u)             0 0 currentColor,
+    calc(var(--u) *  3) var(--u)             0 0 currentColor,
+    calc(var(--u) *  4) var(--u)             0 0 currentColor,
+    calc(var(--u) *  0) calc(var(--u) *  2)  0 0 currentColor,
+    calc(var(--u) *  1) calc(var(--u) *  2)  0 0 currentColor,
+    calc(var(--u) *  2) calc(var(--u) *  2)  0 0 currentColor,
+    calc(var(--u) *  3) calc(var(--u) *  2)  0 0 currentColor;
+}
+
+/* Shape B: a wider fluffy cloud, 8 cells wide. */
+.cloud-b {
+  box-shadow:
+    calc(var(--u) *  1) 0                    0 0 currentColor,
+    calc(var(--u) *  4) 0                    0 0 currentColor,
+    calc(var(--u) *  5) 0                    0 0 currentColor,
+    calc(var(--u) * -1) var(--u)             0 0 currentColor,
+    calc(var(--u) *  0) var(--u)             0 0 currentColor,
+    calc(var(--u) *  1) var(--u)             0 0 currentColor,
+    calc(var(--u) *  2) var(--u)             0 0 currentColor,
+    calc(var(--u) *  3) var(--u)             0 0 currentColor,
+    calc(var(--u) *  4) var(--u)             0 0 currentColor,
+    calc(var(--u) *  5) var(--u)             0 0 currentColor,
+    calc(var(--u) *  6) var(--u)             0 0 currentColor,
+    calc(var(--u) *  0) calc(var(--u) *  2)  0 0 currentColor,
+    calc(var(--u) *  1) calc(var(--u) *  2)  0 0 currentColor,
+    calc(var(--u) *  2) calc(var(--u) *  2)  0 0 currentColor,
+    calc(var(--u) *  3) calc(var(--u) *  2)  0 0 currentColor,
+    calc(var(--u) *  4) calc(var(--u) *  2)  0 0 currentColor,
+    calc(var(--u) *  5) calc(var(--u) *  2)  0 0 currentColor;
+}
+
+/* Depth layers pair size with speed - that pairing, not distance itself,
+   is what reads as parallax. */
+.cloud.is-far {
+  --u: 3px;
+  color: color-mix(in srgb, var(--surface) 70%, var(--bg));
+  opacity: .55;
+  animation-duration: 130s;
+}
+.cloud.is-mid {
+  --u: 5px;
+  color: color-mix(in srgb, var(--surface) 85%, var(--bg));
+  opacity: .75;
+  animation-duration: 85s;
+}
+.cloud.is-near {
+  --u: 8px;
+  color: var(--surface);
+  opacity: .9;
+  animation-duration: 50s;
+}

@@ -31,22 +31,12 @@ describe('Header', () => {
     expect(screen.queryByRole('button', { name: /sign in/i })).not.toBeInTheDocument();
   });
 
-  it('still shows the brand mark', () => {
+  it('shows the brand mark, everywhere, at one size', () => {
+    // logo.png carries its own "AuroraCoin" wordmark, so the image's alt
+    // text is what names the link - there is no separate title element.
     renderHeader({ user: { isAnonymous: true } });
-    expect(screen.getByText('AuroraCoin')).toBeInTheDocument();
-  });
-
-  it('shows the compact favicon and a title by default', () => {
-    // Decorative here (alt=""): the visible title is what names the link, so
-    // the image is found by its src rather than by role or alt text.
-    renderHeader();
     const brand = screen.getByRole('link', { name: 'AuroraCoin' });
-    expect(brand.querySelector('img')).toHaveAttribute('src', '/icon.png');
-  });
-
-  it('shows the full crest on the hero screen', () => {
-    renderHeader({ hero: true });
-    expect(screen.getByAltText('AuroraCoin')).toHaveAttribute('src', '/aurora_logo_512.png');
+    expect(brand.querySelector('img')).toHaveAttribute('src', '/logo.png');
   });
 
   it('asks a child to confirm before signing out, since it cannot be undone', async () => {
