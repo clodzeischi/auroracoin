@@ -48,9 +48,9 @@ export const CoinTable = ({ backend, user }) => {
                             <tr>
                                 <th>Amount</th>
                                 <th>Category</th>
-                                <th>Date</th>
-                                {!readOnly && <th className="hide-sm">Added by</th>}
-                                <th>Comment</th>
+                                <th className="hide-date">Date</th>
+                                {!readOnly && <th className="hide-user">Added by</th>}
+                                <th className="hide-comment">Comment</th>
                                 {!readOnly && <th><span className="sr-only">Actions</span></th>}
                             </tr>
                         </thead>

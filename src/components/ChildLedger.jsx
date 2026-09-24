@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AuroraGreeting } from './AuroraGreeting.jsx';
 import { CoinCount } from './CoinCount.jsx';
 import { CoinDashboard } from './CoinDashboard.jsx';
 import { CoinTable } from './CoinTable.jsx';
@@ -29,7 +30,14 @@ export const ChildLedger = ({ child, ledger, user, onBack }) => {
                 )}
             </div>
 
-            <CoinCount ledger={ledger} label={child ? `${child.name}'s balance` : 'Total balance'} />
+            {/* A parent scanning several children wants the number big and
+                first. The child whose coins these are gets greeted instead -
+                same figure, said rather than displayed. */}
+            {readOnly ? (
+                <AuroraGreeting child={child} ledger={ledger} />
+            ) : (
+                <CoinCount ledger={ledger} label={child ? `${child.name}'s balance` : 'Total balance'} />
+            )}
             <CoinDashboard backend={ledger} />
             <CoinTable backend={ledger} user={user} />
 

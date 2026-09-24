@@ -13,12 +13,20 @@
   --surface-2:  #FFF3D6;
   --ink:        #22314F;
   --ink-2:      #48577C;
-  --ink-3:      #7C88A8;
+  --ink-3:      #596586;
   --line:       #CFE8FB;
   --line-2:     #9FD3F5;
+  /* Two steps of each meaning colour, because one value cannot do both
+     jobs. The bright step is a fill you lay ink on; as text on the cream
+     panel it reads 2.2:1, under even the large-text floor, which is why the
+     amounts used to look washed out rather than bold. The -ink step is the
+     same hue dropped until it carries small text on cream and on its own
+     tint. Green still means coins in and violet coins out either way. */
   --earned:     #22C55E;
+  --earned-ink: #15803D;
   --earned-bg:  #DDFCE7;
   --spent:      #9B5DE5;
+  --spent-ink:  #7C3AED;
   --spent-bg:   #F1E4FF;
   --danger:     #EF4444;
   --danger-bg:  #FFE1E1;
@@ -64,8 +72,13 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--ui);
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 24px;
+  line-height: 1.5;
+  /* A little air between glyphs, everywhere. Jersey 10's pixel glyphs sit
+     tight on their advance widths, and at this size the words read as one
+     block without it; rules that set their own tracking add to this
+     baseline rather than replacing the idea. */
+  letter-spacing: .02em;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -81,7 +94,7 @@ body {
   }
 }
 
-.shell { max-width: 880px; margin: 0 auto; padding: 0 20px 72px; }
+.shell { max-width: 1070px; margin: 0 auto; padding: 0 20px 72px; }
 
 /* ---------------- banner ---------------- */
 .banner {
@@ -92,13 +105,13 @@ body {
   gap: 6px 14px;
   background: var(--warn-bg);
   color: var(--warn);
-  font-size: 12px;
+  font-size: 19.2px;
   font-weight: 600;
-  letter-spacing: .04em;
+  letter-spacing: .06em;
   padding: 6px 12px;
   border-bottom: 1px solid var(--line);
 }
-.banner-personas { display: inline-flex; gap: 4px; }
+.banner-personas { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
 .persona {
   font: inherit;
   color: inherit;
@@ -122,19 +135,18 @@ body {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.amount-plain.is-earned { color: var(--earned); }
-.amount-plain.is-spent { color: var(--spent); }
+.amount-plain.is-earned { color: var(--earned-ink); }
+.amount-plain.is-spent { color: var(--spent-ink); }
 
-/* ---------------- header ---------------- */
+/* ---------------- header ----------------
+   A plain block that scrolls away, painting nothing of its own. It used to be
+   a sticky translucent bar, which bought pinned access to one button at the
+   cost of a permanent blurred band and a hard rule drawn across the sky - the
+   clouds passed behind a frosted stripe and the parallax died at that line.
+   Sign-out is not frequent enough to be worth it, so the sky wins. */
 .header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  padding: 14px 0;
-  margin-bottom: 8px;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--line);
+  padding: 8px 0;
+  margin-bottom: 4px;
 }
 .header-row {
   display: flex;
@@ -147,15 +159,21 @@ body {
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
 /* One size everywhere - logo.png carries its own "AuroraCoin" wordmark, so
    there is no separate text label sized against it and nothing keying off
-   screen (the old hero/compact split is gone). 96px is large enough to
-   keep that wordmark legible; translateY in % (not px) is relative to the
-   image's own box, so the bob stays proportional if this size ever
-   changes again. Linear timing between eight sine-sampled keyframe points,
+   screen (the old hero/compact split is gone). 108px is the asset's own
+   size: at 72px the browser was resampling a 108px grid down by two thirds
+   and smoothing every hard edge away, which is what made a pixel-art shield
+   read as merely small artwork. Pixel art only survives at whole-number
+   ratios, so the sizes available here are 108 (1:1) and 216 (2:1) - nothing
+   between them keeps the blocks square. image-rendering below is the other
+   half of it: without it the browser interpolates and there is no point
+   picking the ratio at all. translateY in % (not px) is relative to the
+   image's own box, so the bob stays proportional if this size ever changes. Linear timing between eight sine-sampled keyframe points,
    rather than easing between two, is what keeps it an actual sine wave
    instead of a bounce. */
 .brand img {
-  width: 96px;
-  height: 96px;
+  width: 108px;
+  height: 108px;
+  image-rendering: pixelated;
   animation: logo-bob 4s linear infinite;
 }
 @keyframes logo-bob {
@@ -178,9 +196,12 @@ body {
    a raised block gets pushed down onto its socket. */
 .btn {
   font-family: var(--ui);
-  font-size: 14px;
+  font-size: 22.4px;
   font-weight: 700;
-  color: #fff;
+  /* Ink on a bright fill, not white: white on this green is 2.3:1, and dark
+     text on saturated colour is the era's own idiom anyway. The two darker
+     fills below take cream instead, for the same reason in reverse. */
+  color: var(--ink);
   border: none;
   border-radius: 0;
   padding: 10px 16px;
@@ -198,8 +219,8 @@ body {
 .btn:disabled { opacity: .55; cursor: not-allowed; }
 
 .btn-primary { background: var(--earned); }
-.btn-quiet { background: var(--ink-3); }
-.btn-danger { background: var(--danger); }
+.btn-quiet { background: var(--ink-3); color: var(--surface); }
+.btn-danger { background: var(--danger); color: var(--surface); }
 
 /* ---------------- balance hero ---------------- */
 .balance {
@@ -208,9 +229,9 @@ body {
 }
 .balance-label {
   margin: 0 0 4px;
-  font-size: 17px;
+  font-size: 27.2px;
   font-weight: 700;
-  letter-spacing: .14em;
+  letter-spacing: .16em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -218,24 +239,25 @@ body {
   margin: 0;
   font-family: var(--display);
   font-weight: 600;
-  font-size: clamp(3.2rem, 14vw, 5rem);
+  font-size: clamp(4.48rem, 17.6vw, 8rem);
   line-height: 1;
-  letter-spacing: -.03em;
+  letter-spacing: -.01em;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
-.balance-value.is-earned { color: var(--earned); }
-.balance-value.is-spent { color: var(--spent); }
+.balance-value.is-earned { color: var(--earned-ink); }
+.balance-value.is-spent { color: var(--spent-ink); }
 .balance-unit {
   display: block;
   margin-top: 8px;
   font-family: var(--ui);
-  font-size: 19.5px;
+  font-size: 31.2px;
   font-weight: 600;
-  letter-spacing: .1em;
+  letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
-.balance-error { color: var(--danger); font-size: 14px; margin: 0; }
+.balance-error { color: var(--danger); font-size: 22.4px; margin: 0; }
 
 /* ---------------- card ---------------- */
 .card {
@@ -255,32 +277,32 @@ body {
 }
 .card-title {
   font-family: var(--display);
-  font-size: 1.08rem;
+  font-size: 1.73rem;
   font-weight: 600;
   margin: 0;
-  letter-spacing: -.01em;
+  letter-spacing: .01em;
 }
 
 /* ---------------- stats ---------------- */
 .stats { display: flex; gap: 26px; flex-wrap: wrap; }
 .stat-label {
-  font-size: 16px;
+  font-size: 25.6px;
   font-weight: 700;
-  letter-spacing: .12em;
+  letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--ink-3);
   margin: 0 0 1px;
 }
 .stat-value {
   font-family: var(--display);
-  font-size: 1.6rem;
+  font-size: 2.56rem;
   font-weight: 600;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
   margin: 0;
 }
-.stat-value.is-earned { color: var(--earned); }
-.stat-value.is-spent { color: var(--spent); }
+.stat-value.is-earned { color: var(--earned-ink); }
+.stat-value.is-spent { color: var(--spent-ink); }
 
 /* ---------------- breakdown ---------------- */
 .breakdowns { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
@@ -297,35 +319,35 @@ body {
 }
 .bd-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 25.6px;
   font-weight: 700;
-  letter-spacing: .12em;
+  letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
-.bd-total { font-family: var(--display); font-weight: 700; font-variant-numeric: tabular-nums; font-size: 14px; }
+.bd-total { font-family: var(--display); font-weight: 700; font-variant-numeric: tabular-nums; font-size: 22.4px; }
 .bd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .bd-row-top {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
-  font-size: 13.5px;
+  font-size: 21.6px;
   margin-bottom: 5px;
 }
 .bd-name { font-weight: 600; }
 .bd-figures { font-family: var(--display); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.bd-share { color: var(--ink-3); margin-left: 8px; font-size: 12.5px; }
+.bd-share { color: var(--ink-3); margin-left: 8px; font-size: 20px; }
 .bd-track { height: 7px; background: var(--surface-2); overflow: hidden; }
 .bd-fill { height: 100%; }
 .bd-fill.is-earned { background: var(--earned); }
 .bd-fill.is-spent { background: var(--spent); }
-.bd-empty { color: var(--ink-3); font-size: 13px; margin: 0; }
+.bd-empty { color: var(--ink-3); font-size: 20.8px; margin: 0; }
 
 /* ---------------- select ---------------- */
 .select {
   font-family: var(--ui);
-  font-size: 13.5px;
+  font-size: 21.6px;
   font-weight: 600;
   color: var(--ink);
   background: var(--surface-2);
@@ -341,13 +363,13 @@ body {
 }
 
 /* ---------------- ledger ---------------- */
-.ledger-wrap { overflow-x: auto; }
-table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ledger-wrap { overflow-x: auto; contain: paint; }
+table.ledger { width: 100%; border-collapse: collapse; font-size: 22.4px; }
 .ledger th {
   text-align: left;
-  font-size: 16px;
+  font-size: 25.6px;
   font-weight: 700;
-  letter-spacing: .11em;
+  letter-spacing: .13em;
   text-transform: uppercase;
   color: var(--ink-3);
   padding: 0 14px 9px 0;
@@ -374,8 +396,8 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   transition: text-decoration-color .15s ease;
 }
 .amount-btn:hover { text-decoration: underline; text-decoration-color: currentColor; }
-.amount-btn.is-earned { color: var(--earned); }
-.amount-btn.is-spent { color: var(--spent); }
+.amount-btn.is-earned { color: var(--earned-ink); }
+.amount-btn.is-spent { color: var(--spent-ink); }
 
 .ledger-row { cursor: pointer; }
 
@@ -385,9 +407,9 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   align-items: center;
   justify-content: center;
   /* Comfortable on a phone, unobtrusive on a desktop. */
-  width: 32px;
-  height: 32px;
-  font-size: 19px;
+  width: 42px;
+  height: 42px;
+  font-size: 30.4px;
   line-height: 1;
   background: none;
   border: 0;
@@ -403,7 +425,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 .edited-note {
   display: block;
   margin-top: 2px;
-  font-size: 11.5px;
+  font-size: 18.4px;
   line-height: 1.35;
   color: var(--ink-3);
   font-style: italic;
@@ -411,27 +433,34 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 
 @media (hover: none) {
   /* No hover on touch, so the control is always visible and bigger. */
-  .row-delete { opacity: .8; width: 38px; height: 38px; }
+  .row-delete { opacity: .8; width: 50px; height: 50px; }
 }
-.cell-time, .cell-user { color: var(--ink-3); font-size: 13px; white-space: nowrap; }
+.cell-time, .cell-user { color: var(--ink-3); font-size: 20.8px; white-space: nowrap; }
 .cell-comment { color: var(--ink-2); }
 
 .chip {
   display: inline-block;
-  font-size: 11.5px;
+  font-size: 18.4px;
   font-weight: 700;
-  letter-spacing: .02em;
+  letter-spacing: .04em;
   padding: 3px 9px;
   background: var(--surface-2);
   color: var(--ink-2);
   white-space: nowrap;
 }
-.chip.is-earned { background: var(--earned-bg); color: var(--earned); }
-.chip.is-spent { background: var(--spent-bg); color: var(--spent); }
+.chip.is-earned { background: var(--earned-bg); color: var(--earned-ink); }
+.chip.is-spent { background: var(--spent-bg); color: var(--spent-ink); }
 
-@media (max-width: 620px) { .hide-sm { display: none; } }
+/* The ledger sheds columns as the viewport narrows, least load-bearing
+   first: the comment, then who added it, then the date. The amount and its
+   category are the entry itself, so they never go. Each breakpoint is where
+   that column actually stops fitting rather than a tidy round number, and
+   below the last one the table still scrolls inside its card. */
+@media (max-width: 620px) { .hide-user { display: none; } }
+@media (max-width: 540px) { .hide-comment { display: none; } }
+@media (max-width: 420px) { .hide-date { display: none; } }
 
-.state { color: var(--ink-3); font-size: 14px; margin: 0; }
+.state { color: var(--ink-3); font-size: 22.4px; margin: 0; }
 .state.is-error { color: var(--danger); }
 
 /* ---------------- modal ---------------- */
@@ -452,7 +481,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
    backdrop), then the same hard drop shadow every raised block gets. */
 .modal {
   width: 100%;
-  max-width: 400px;
+  max-width: 530px;
   background: var(--surface);
   border: 3px solid var(--ink);
   box-shadow: 0 0 0 3px var(--surface-2), var(--shadow-lg);
@@ -461,11 +490,11 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
 @keyframes rise { from { opacity: 0; transform: translateY(10px) scale(.99) } to { opacity: 1; transform: none } }
 
-.modal-sm { max-width: 340px; }
+.modal-sm { max-width: 440px; }
 .confirm-detail {
   margin: 8px 0 0;
   font-family: var(--display);
-  font-size: 14px;
+  font-size: 22.4px;
   font-weight: 600;
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
@@ -483,11 +512,11 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   border-bottom: 3px solid var(--surface-2);
 }
 .modal-head .modal-title { color: var(--surface); }
-.modal-title { margin: 0; font-family: var(--display); font-size: 1.05rem; font-weight: 600; }
+.modal-title { margin: 0; font-family: var(--display); font-size: 1.68rem; font-weight: 600; }
 .modal-close {
   background: none;
   border: 0;
-  font-size: 21px;
+  font-size: 33.6px;
   line-height: 1;
   color: var(--surface-2);
   cursor: pointer;
@@ -507,15 +536,15 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 /* ---------------- fields ---------------- */
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field label, .field-label {
-  font-size: 16.5px;
+  font-size: 26.4px;
   font-weight: 700;
-  letter-spacing: .1em;
+  letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
 .field input, .field select {
   font-family: var(--ui);
-  font-size: 15px;
+  font-size: 24px;
   color: var(--ink);
   background: var(--surface-2);
   border: 2px solid var(--ink);
@@ -532,15 +561,15 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
               0 0 0 3px color-mix(in srgb, var(--earned) 30%, transparent);
 }
 .field select:disabled { color: var(--ink-3); cursor: not-allowed; opacity: .55; }
-.field-hint { font-size: 12px; color: var(--ink-3); }
+.field-hint { font-size: 19.2px; color: var(--ink-3); }
 
 .direction-toggle { display: flex; gap: 8px; }
 .direction-btn {
   flex: 1;
   font-family: var(--ui);
-  font-size: 14px;
+  font-size: 22.4px;
   font-weight: 700;
-  color: #fff;
+  color: var(--surface);
   background: var(--ink-3);
   border: none;
   border-radius: 0;
@@ -555,7 +584,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   transform: translate(3px, 3px);
   box-shadow: 0 0 0 0 rgba(0, 0, 0, .35);
 }
-.direction-btn.is-active.is-earned { background: var(--earned); }
+.direction-btn.is-active.is-earned { background: var(--earned); color: var(--ink); }
 .direction-btn.is-active.is-spent { background: var(--spent); }
 
 .alert {
@@ -563,7 +592,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   color: var(--danger);
   border-radius: var(--radius-sm);
   padding: 9px 12px;
-  font-size: 13px;
+  font-size: 20.8px;
   font-weight: 600;
 }
 
@@ -582,6 +611,11 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
    carries the logo, title and sign-in. */
 .intro {
   min-height: 70dvh;
+  /* Capped like the onboarding column it hands off to. Unbounded, the bubble
+     took the full shell and Aurora ended up addressing a metre of empty sky
+     from the far corner of it - the scene only reads as a scene while she and
+     what she says stay within arm's length of each other. */
+  max-width: 44rem;
   padding: 24px 0 40px;
   display: flex;
   flex-direction: column;
@@ -610,7 +644,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 }
 .mascot-line {
   margin: 0;
-  font-size: 14px;
+  font-size: 22.4px;
   font-weight: 600;
   line-height: 1.5;
   min-height: 1.5em;
@@ -627,33 +661,71 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 @keyframes blink { 50% { opacity: 0; } }
 .mascot-hint {
   margin: 10px 0 0;
-  font-size: 16.5px;
+  font-size: 26.4px;
   font-weight: 700;
-  letter-spacing: .06em;
+  letter-spacing: .08em;
   text-transform: uppercase;
   color: var(--ink-3);
   animation: blink 1.4s step-end infinite;
 }
+/* Aurora is drawn on roughly a 4px grid inside a 512px sprite, so she only
+   reads as pixel art at a whole-number ratio of that: 256 is 1:2 and puts
+   every block on exactly 2 CSS pixels, 128 is 1:4. The old 34vw sized her to
+   whatever the viewport happened to be - always a fractional ratio, always
+   resampled - which is why the pixels were invisible at any width. */
 .mascot {
-  width: 34vw;
-  max-width: 168px;
-  min-width: 108px;
+  width: 256px;
   flex-shrink: 0;
+  image-rendering: pixelated;
+}
+@media (max-width: 620px) {
+  .mascot { width: 128px; }
 }
 .intro-alert { margin: 0; }
 .intro-pair {
   padding-top: 18px;
   border-top: 1px solid var(--line);
-  font-size: 13px;
+  font-size: 20.8px;
   color: var(--ink-3);
 }
 
-/* ---------------- onboarding ---------------- */
-.onboarding { padding: 40px 0; max-width: 27rem; }
-.eyebrow {
-  font-size: 16px;
+/* ---------------- a child's greeting ----------------
+   Aurora where the balance hero used to be. She keeps the hero's vertical
+   room rather than the hero's type size: the number is now a phrase in a
+   sentence, so it needs weight and colour to stay findable, not 160px. */
+.aurora-greet { padding: 22px 0 26px; max-width: 50rem; }
+.aurora-greet .mascot-scene { align-items: flex-end; }
+.aurora-greet .mascot-bubble { align-self: center; }
+.aurora-balance {
+  margin: .5rem 0 0;
+  font-size: 22.4px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.aurora-count {
+  font-family: var(--display);
   font-weight: 700;
-  letter-spacing: .14em;
+  font-size: 1.35em;
+  font-variant-numeric: tabular-nums;
+}
+.aurora-count.is-earned { color: var(--earned-ink); }
+.aurora-count.is-spent { color: var(--spent-ink); }
+.aurora-note {
+  margin: .75rem 0 0;
+  padding-top: .7rem;
+  border-top: 1px solid var(--line);
+  font-size: 20.8px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  font-style: italic;
+}
+
+/* ---------------- onboarding ---------------- */
+.onboarding { padding: 40px 0; max-width: 37rem; }
+.eyebrow {
+  font-size: 25.6px;
+  font-weight: 700;
+  letter-spacing: .16em;
   text-transform: uppercase;
   color: var(--ink-3);
   margin: 0 0 8px;
@@ -661,8 +733,8 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 .onboarding-title {
   font-family: var(--display);
   font-weight: 600;
-  font-size: 1.9rem;
-  letter-spacing: -.015em;
+  font-size: 3.04rem;
+  letter-spacing: .005em;
   margin: 0 0 18px;
 }
 .added-list {
@@ -675,8 +747,8 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 }
 .added-list li {
   background: var(--earned-bg);
-  color: var(--earned);
-  font-size: 13px;
+  color: var(--earned-ink);
+  font-size: 20.8px;
   font-weight: 600;
   padding: 4px 11px;
 }
@@ -692,15 +764,16 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 .family-title {
   font-family: var(--display);
   font-weight: 600;
-  font-size: clamp(1.8rem, 5vw, 2.3rem);
-  letter-spacing: -.02em;
+  font-size: clamp(2.88rem, 8vw, 3.68rem);
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
   margin: 0;
 }
-.family-sub { margin: 4px 0 0; color: var(--ink-3); font-size: 13.5px; }
+.family-sub { margin: 4px 0 0; color: var(--ink-3); font-size: 21.6px; }
 
 .child-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 14px;
 }
 .child-card {
@@ -725,20 +798,20 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   gap: 12px;
   margin-bottom: 8px;
 }
-.child-name { font-family: var(--display); font-size: 1.2rem; font-weight: 600; }
+.child-name { font-family: var(--display); font-size: 1.92rem; font-weight: 600; }
 .child-balance {
   font-family: var(--display);
-  font-size: 1.55rem;
+  font-size: 2.48rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -.01em;
+  letter-spacing: .01em;
 }
-.child-balance.is-earned { color: var(--earned); }
-.child-balance.is-spent { color: var(--spent); }
-.child-line { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+.child-balance.is-earned { color: var(--earned-ink); }
+.child-balance.is-spent { color: var(--spent-ink); }
+.child-line { margin: 0; font-size: 21.6px; line-height: 1.5; color: var(--ink-2); }
 .child-line.is-error { color: var(--danger); }
-.child-line .is-earned { color: var(--earned); }
-.child-line .is-spent { color: var(--spent); }
+.child-line .is-earned { color: var(--earned-ink); }
+.child-line .is-spent { color: var(--spent-ink); }
 
 /* Same bottom margin as .card, so the row sits in the page's rhythm instead
    of butting up against the card that follows it. */
@@ -754,7 +827,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 }
 .back-link {
   font: inherit;
-  font-size: 13.5px;
+  font-size: 21.6px;
   font-weight: 600;
   background: none;
   border: 0;
@@ -769,7 +842,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 .child-name {
   font: inherit;
   font-family: var(--display);
-  font-size: 1.2rem;
+  font-size: 1.92rem;
   font-weight: 600;
   background: none;
   border: 0;
@@ -789,7 +862,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 }
 .link-btn {
   font: inherit;
-  font-size: 12.5px;
+  font-size: 20px;
   font-weight: 600;
   background: none;
   border: 0;
@@ -836,7 +909,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 13.5px;
+  font-size: 21.6px;
   color: var(--ink-2);
 }
 
@@ -850,7 +923,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   margin: 4px 0 6px;
   text-align: center;
   font-family: var(--mono);
-  font-size: 34px;
+  font-size: clamp(32px, 9.6vw, 54.4px);
   font-weight: 700;
   letter-spacing: .22em;
   /* The tracking is applied to the right of each glyph, including the last,
@@ -873,7 +946,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 
 .code-input {
   font-family: var(--mono);
-  font-size: 24px;
+  font-size: 38.4px;
   letter-spacing: .18em;
   text-transform: uppercase;
   text-align: center;
@@ -885,7 +958,7 @@ table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   display: flex;
   flex-direction: column;
   gap: 7px;
-  font-size: 13.5px;
+  font-size: 21.6px;
   color: var(--ink-2);
 }
 .pair-steps strong { color: var(--ink); font-weight: 600; }

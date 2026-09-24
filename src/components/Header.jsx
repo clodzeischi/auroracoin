@@ -65,7 +65,10 @@ export const Header = ({user, loading, login, logout}) => {
                     ) : user ? (
                         <button className="btn btn-quiet" onClick={logout}>Sign out</button>
                     ) : (
-                        <button className="btn btn-quiet" onClick={startSignIn} disabled={signingIn}>
+                        // The one action on the intro screen, so it leads
+                        // rather than sitting quiet next to a sign-out, which
+                        // is only ever a way back out.
+                        <button className="btn btn-primary" onClick={startSignIn} disabled={signingIn}>
                             {signingIn ? 'Signing in…' : 'Sign in with Google'}
                         </button>
                     )}

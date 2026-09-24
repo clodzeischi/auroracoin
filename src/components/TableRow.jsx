@@ -9,8 +9,8 @@ export const TableRow = ({ data, onEdit, onDelete, readOnly = false }) => {
             <tr>
                 <td className={`cell-amount amount-plain is-${tone}`}>{display}</td>
                 <td><span className={`chip is-${tone}`}>{data.category}</span></td>
-                <td className="cell-time">{data.time}</td>
-                <td className="cell-comment">{data.comment}</td>
+                <td className="cell-time hide-date">{data.time}</td>
+                <td className="cell-comment hide-comment">{data.comment}</td>
             </tr>
         );
     }
@@ -32,9 +32,9 @@ export const TableRow = ({ data, onEdit, onDelete, readOnly = false }) => {
                 </button>
             </td>
             <td><span className={`chip is-${tone}`}>{data.category}</span></td>
-            <td className="cell-time">{data.time}</td>
-            <td className="cell-user hide-sm">{data.user}</td>
-            <td className="cell-comment">
+            <td className="cell-time hide-date">{data.time}</td>
+            <td className="cell-user hide-user">{data.user}</td>
+            <td className="cell-comment hide-comment">
                 {data.comment}
                 {data.editedNote && <span className="edited-note">{data.editedNote}</span>}
             </td>
